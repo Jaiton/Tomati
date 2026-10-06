@@ -1,0 +1,6 @@
+{
+  "name": "Tomati | Gastronomia Artesanal & Molhos Lentos",
+  "description": "Vitrine digital e landing page da Tomati: molhos de cozimento lento, massas frescas e comfort food artesanal. Peça pelo portal de pedidos ou pelo iFood.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
