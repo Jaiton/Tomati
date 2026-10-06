@@ -100,7 +100,7 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
   const [newAdminPassword, setNewAdminPassword] = useState(config.adminPassword || 'admin');
   const [editAdminEmail, setEditAdminEmail] = useState(config.adminEmail || '');
   const [editAdminName, setEditAdminName] = useState(config.adminName || '');
-  const [customDomainInput, setCustomDomainInput] = useState(config.customDomain || 'tomati.com.br');
+  const [customDomainInput, setCustomDomainInput] = useState(config.customDomain || 'tomatibrasil.com.br');
 
   // Estado do formulário de produto (criar ou editar)
   const [isEditingProduct, setIsEditingProduct] = useState(false);

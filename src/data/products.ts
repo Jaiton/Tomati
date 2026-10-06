@@ -50,6 +50,7 @@ export const DEFAULT_STORE_CONFIG: StoreConfig = {
     },
   ],
   adminPassword: 'admin',
+  customDomain: 'tomatibrasil.com.br',
 };
 
 export const PRODUCTS: Product[] = [
