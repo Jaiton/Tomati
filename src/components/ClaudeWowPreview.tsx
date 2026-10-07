@@ -15,7 +15,7 @@ const D = {
     tiktok: '@tomatibrasil',
   },
   img: {
-    logo: '',
+    logo: '/logo_tomati_light.svg',
     favicon: '',
   },
   regiao: 'Curitiba e Região',
@@ -204,25 +204,46 @@ function renderArt(artObj: any, nome: string) {
   );
 }
 
-// Helper para redimensionamento de imagens idêntico ao Claude
+// Helper para redimensionamento de imagens resiliente com fallback
 function compressImage(file: File, maxWidth: number, mimeType: string, callback: (base64: string) => void) {
-  const img = new Image();
-  const url = URL.createObjectURL(file);
-  img.onload = () => {
-    const w = img.width || 300;
-    const h = img.height || 300;
-    const k = Math.min(1, maxWidth / w);
-    const canvas = document.createElement('canvas');
-    canvas.width = w * k;
-    canvas.height = h * k;
-    const ctx = canvas.getContext('2d');
-    if (ctx) {
-      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-      URL.revokeObjectURL(url);
-      callback(canvas.toDataURL(mimeType, 0.85));
-    }
+  const fallback = () => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === 'string') callback(reader.result);
+    };
+    reader.readAsDataURL(file);
   };
-  img.src = url;
+
+  try {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      try {
+        const w = img.width || 300;
+        const h = img.height || 300;
+        const k = Math.min(1, maxWidth / w);
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.round(w * k);
+        canvas.height = Math.round(h * k);
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+          URL.revokeObjectURL(url);
+          callback(canvas.toDataURL(mimeType, 0.88));
+          return;
+        }
+      } catch {
+        // Fallback
+      }
+      fallback();
+    };
+    img.onerror = () => {
+      fallback();
+    };
+    img.src = url;
+  } catch {
+    fallback();
+  }
 }
 
 export const ClaudeWowPreview: React.FC<any> = () => {
@@ -242,6 +263,7 @@ export const ClaudeWowPreview: React.FC<any> = () => {
   const [isAdminOpen, setIsAdminOpen] = useState(false);
   const [adminMsg, setAdminMsg] = useState('');
   const [syncStatus, setSyncStatus] = useState<'online' | 'salvando' | 'erro' | 'carregando'>('carregando');
+  const [lastSavedTime, setLastSavedTime] = useState<string>('');
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [isAdminAuthenticated, setIsAdminAuthenticated] = useState<boolean>(() => {
     try {
@@ -339,7 +361,9 @@ export const ClaudeWowPreview: React.FC<any> = () => {
       });
       if (res.ok) {
         setSyncStatus('online');
-        setAdminMsg('✅ Salvo e publicado online para todos os visitantes!');
+        const now = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+        setLastSavedTime(now);
+        setAdminMsg(`✅ Salvo com sucesso no servidor às ${now}! Online para todos.`);
       } else {
         setSyncStatus('erro');
         setAdminMsg('⚠️ Salvo localmente, mas erro ao sincronizar com o servidor.');
@@ -551,17 +575,11 @@ export const ClaudeWowPreview: React.FC<any> = () => {
             aria-label="Tomati"
             style={{ flexShrink: 0, minWidth: 'max-content' }}
           >
-            {data.img?.logo ? (
-              <img
-                src={data.img.logo}
-                alt="Tomati"
-                style={{ height: '36px', width: 'auto', display: 'block', flexShrink: 0 }}
-              />
-            ) : (
-              <span className="flex items-center gap-2 shrink-0" style={{ flexShrink: 0 }}>
-                <TomatiLogo size="sm" variant="light" />
-              </span>
-            )}
+            <img
+              src={data.img?.logo || '/logo_tomati_light.svg'}
+              alt="Tomati Oficial"
+              style={{ height: '34px', width: 'auto', display: 'block', flexShrink: 0 }}
+            />
           </a>
 
           <nav className="nav-main">
@@ -784,14 +802,12 @@ export const ClaudeWowPreview: React.FC<any> = () => {
       <footer>
         <div className="w">
           <div>
-            <div className="logo" style={{ fontSize: '36px', color: '#fff' }}>
-              {data.img?.logo ? (
-                <img src={data.img.logo} alt="Tomati" style={{ height: '36px', width: 'auto', display: 'block' }} />
-              ) : (
-                <span className="flex items-center gap-2">
-                  <TomatiLogo size="md" variant="light" />
-                </span>
-              )}
+            <div className="logo" style={{ color: '#fff' }}>
+              <img
+                src={data.img?.logo || '/logo_tomati_light.svg'}
+                alt="Tomati Oficial"
+                style={{ height: '36px', width: 'auto', display: 'block', flexShrink: 0 }}
+              />
             </div>
             <p style={{ marginTop: '8px' }}>mais perto, mais fácil.</p>
           </div>
@@ -900,6 +916,43 @@ export const ClaudeWowPreview: React.FC<any> = () => {
             <p style={{ margin: 0, fontSize: '13px', opacity: 0.9, lineHeight: 1.4 }}>
               As fotos enviadas e alterações são salvas automaticamente no servidor e ficam <b>visíveis online para todos os visitantes</b> em tempo real.
             </p>
+
+            <button
+              type="button"
+              onClick={() => persistData(data)}
+              disabled={syncStatus === 'salvando'}
+              style={{
+                marginTop: '6px',
+                width: '100%',
+                padding: '10px 14px',
+                borderRadius: '10px',
+                background: '#FFC93C',
+                color: '#14201A',
+                fontWeight: 700,
+                fontSize: '13.5px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px',
+                border: 'none',
+                cursor: syncStatus === 'salvando' ? 'not-allowed' : 'pointer',
+                boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
+                opacity: syncStatus === 'salvando' ? 0.7 : 1,
+                transition: 'all 0.2s',
+              }}
+            >
+              {syncStatus === 'salvando' ? (
+                <span>Salvando no Servidor...</span>
+              ) : (
+                <span>💾 Salvar Alterações no Servidor</span>
+              )}
+            </button>
+
+            {lastSavedTime && (
+              <span style={{ fontSize: '11px', opacity: 0.75, textAlign: 'center', display: 'block', marginTop: '2px' }}>
+                Última gravação confirmada no servidor: às {lastSavedTime}
+              </span>
+            )}
           </div>
 
           {/* Textos, links e contato */}

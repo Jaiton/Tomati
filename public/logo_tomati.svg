@@ -1,10 +1,10 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 520 120" fill="none">
   <!-- Green circle with white t. -->
   <circle cx="60" cy="60" r="56" fill="#1F3E29" />
-  <text x="58" y="81" font-family="'Plus Jakarta Sans', system-ui, -apple-system, sans-serif" font-weight="900" font-size="76" fill="#FFFFFF" text-anchor="middle" letter-spacing="-2px">t.</text>
+  <text x="60" y="82" font-family="'Plus Jakarta Sans', system-ui, -apple-system, sans-serif" font-weight="900" font-size="76" fill="#FFFFFF" text-anchor="middle" letter-spacing="0">t.</text>
   
   <!-- Wordmark: tomati in dark forest green with tomato red period -->
-  <text x="142" y="82" font-family="'Plus Jakarta Sans', system-ui, -apple-system, sans-serif" font-weight="900" font-size="78" fill="#1F3E29" letter-spacing="-3px">
+  <text x="136" y="83" font-family="'Plus Jakarta Sans', system-ui, -apple-system, sans-serif" font-weight="900" font-size="78" fill="#1F3E29" letter-spacing="-0.5px">
     tomati<tspan fill="#D44A22">.</tspan>
   </text>
 </svg>

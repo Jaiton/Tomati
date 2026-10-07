@@ -105,89 +105,28 @@ export const TomatiLogo: React.FC<TomatiLogoProps> = ({
 
   // Se houver logo personalizada carregada no Admin
   const customLogoUrl = isLight ? customDarkBgUrl : customLightBgUrl;
-  if (customLogoUrl) {
-    return (
-      <img
-        src={customLogoUrl}
-        alt="Tomati"
-        className={`inline-block object-contain select-none shrink-0 ${className}`}
-        style={{ height: heightPx, width: 'auto' }}
-      />
-    );
-  }
+  const officialLogoSrc = isLight ? '/logo_tomati_light.svg' : '/logo_tomati.svg';
 
   // 1. Apenas Ícone Oficial
   if (showIconOnly) {
     return <TomatiIcon size={heightPx} variant={variant} className={className} />;
   }
 
-  // 2. Composição Oficial com Ícone + Tipografia
-  if (withBadge) {
-    const logoWidth = heightPx * 4.3;
-    return (
-      <div className={`inline-flex items-center select-none shrink-0 ${className}`} style={{ height: heightPx, width: logoWidth, flexShrink: 0, minWidth: logoWidth }}>
-        <svg
-          viewBox="0 0 520 120"
-          preserveAspectRatio="xMidYMid meet"
-          style={{ height: heightPx, width: logoWidth, flexShrink: 0 }}
-          className="h-full overflow-visible"
-          aria-label="Tomati Oficial"
-        >
-          <circle cx="60" cy="60" r="56" fill={circleBg} />
-          <text
-            x="58"
-            y="81"
-            fontFamily="system-ui, -apple-system, 'Plus Jakarta Sans', sans-serif"
-            fontWeight="900"
-            fontSize="76"
-            fill={circleTextColor}
-            textAnchor="middle"
-            letterSpacing="-2px"
-          >
-            t.
-          </text>
-          <text
-            x="142"
-            y="82"
-            fontFamily="system-ui, -apple-system, 'Plus Jakarta Sans', sans-serif"
-            fontWeight="900"
-            fontSize="78"
-            fill={greenColor}
-            letterSpacing="-3px"
-          >
-            tomati<tspan fill={tomatoRed}>.</tspan>
-          </text>
-        </svg>
-      </div>
-    );
-  }
-
-  // 3. Tipografia Pura Oficial (Default - tomati.)
-  const pureWidth = Math.round(heightPx * 3.46);
+  // 2. Renderização da Logo Oficial Tomati
   return (
-    <div
-      className={`inline-flex items-center select-none group shrink-0 ${className}`}
-      style={{ height: heightPx, width: pureWidth, flexShrink: 0, minWidth: pureWidth }}
-    >
-      <svg
-        viewBox="0 0 380 110"
-        preserveAspectRatio="xMidYMid meet"
-        style={{ height: heightPx, width: pureWidth, flexShrink: 0, display: 'block' }}
-        className="h-full overflow-visible transition-transform duration-200 group-hover:scale-[1.01]"
-        aria-label="Tomati Oficial"
-      >
-        <text
-          x="2"
-          y="86"
-          fontFamily="system-ui, -apple-system, 'Plus Jakarta Sans', sans-serif"
-          fontWeight="900"
-          fontSize="96"
-          fill={greenColor}
-          letterSpacing="-3.5px"
-        >
-          tomati<tspan fill={tomatoRed}>.</tspan>
-        </text>
-      </svg>
-    </div>
+    <img
+      src={customLogoUrl || officialLogoSrc}
+      alt="Tomati Oficial"
+      className={`inline-block object-contain select-none shrink-0 ${className}`}
+      style={{
+        height: heightPx,
+        width: 'auto',
+        display: 'block',
+        flexShrink: 0,
+        maxWidth: 'none',
+      }}
+      loading="eager"
+      decoding="async"
+    />
   );
 };

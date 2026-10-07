@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Lock, UserPlus, LogIn, X, ShieldAlert, CheckCircle2 } from 'lucide-react';
+import { TomatiLogo } from './TomatiLogo';
+import { X, Lock, LogIn, UserPlus, ShieldAlert, CheckCircle2 } from 'lucide-react';
 
 interface AdminAuthModalProps {
   isOpen: boolean;
@@ -7,13 +8,6 @@ interface AdminAuthModalProps {
   onLoginSuccess: () => void;
 }
 
-interface StoredAdmin {
-  username: string;
-  password: string;
-  name: string;
-}
-
-const ADMIN_STORAGE_KEY = 'tomati_admin_users_v1';
 const AUTH_TOKEN_KEY = 'tomati_admin_session_v1';
 
 export const AdminAuthModal: React.FC<AdminAuthModalProps> = ({
@@ -22,34 +16,37 @@ export const AdminAuthModal: React.FC<AdminAuthModalProps> = ({
   onLoginSuccess,
 }) => {
   const [tab, setTab] = useState<'login' | 'register'>('login');
-  
+
   // Estados de Login
   const [loginUser, setLoginUser] = useState('');
   const [loginPass, setLoginPass] = useState('');
   const [rememberMe, setRememberMe] = useState(true);
-  
+
   // Estados de Cadastro
   const [regName, setRegName] = useState('');
   const [regUser, setRegUser] = useState('');
   const [regPass, setRegPass] = useState('');
   const [regPassConfirm, setRegPassConfirm] = useState('');
-  
-  // Feedback
+
+  // Estados de Carregamento e Feedback
+  const [isLoading, setIsLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
 
-  // Fechar com tecla ESC
+  // Fechar com a tecla ESC
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && isOpen) {
         onClose();
       }
     };
-    window.addEventListener('keydown', handleKeyDown);
+    if (isOpen) {
+      window.addEventListener('keydown', handleKeyDown);
+    }
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, onClose]);
 
-  // Limpar mensagens ao alternar aba
+  // Limpar formulário e mensagens ao alternar aba
   useEffect(() => {
     setErrorMsg('');
     setSuccessMsg('');
@@ -57,56 +54,78 @@ export const AdminAuthModal: React.FC<AdminAuthModalProps> = ({
 
   if (!isOpen) return null;
 
-  const getStoredAdmins = (): StoredAdmin[] => {
-    try {
-      const saved = localStorage.getItem(ADMIN_STORAGE_KEY);
-      if (saved) {
-        return JSON.parse(saved);
-      }
-    } catch {
-      // Ignora erro
-    }
-    // Administrador padrão para acesso inicial seguro
-    return [
-      { username: 'admin', password: 'tomati2026', name: 'Administrador Tomati' },
-      { username: 'admin@tomati.com.br', password: 'tomati2026', name: 'Administrador Tomati' },
-      { username: 'admin', password: 'admin', name: 'Administrador Padrão' },
-    ];
-  };
-
-  const handleLoginSubmit = (e: React.FormEvent) => {
+  const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg('');
+    setSuccessMsg('');
 
     const cleanUser = loginUser.trim().toLowerCase();
     const cleanPass = loginPass.trim();
 
     if (!cleanUser || !cleanPass) {
-      setErrorMsg('Preencha seu usuário e senha.');
+      setErrorMsg('Por favor, preencha seu usuário e senha.');
       return;
     }
 
-    const admins = getStoredAdmins();
-    const found = admins.find(
-      (a) => a.username.toLowerCase() === cleanUser && a.password === cleanPass
-    );
+    setIsLoading(true);
+    try {
+      // 1. Tentar autenticação no Servidor
+      const res = await fetch('/api/admin/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: cleanUser, password: cleanPass }),
+      });
 
-    if (found) {
-      if (rememberMe) {
-        localStorage.setItem(AUTH_TOKEN_KEY, JSON.stringify({ user: found.username, loggedAt: Date.now() }));
-      } else {
-        sessionStorage.setItem(AUTH_TOKEN_KEY, JSON.stringify({ user: found.username, loggedAt: Date.now() }));
+      const data = await res.json();
+
+      if (res.ok && data.success) {
+        const sessionPayload = JSON.stringify({
+          user: data.user?.username || cleanUser,
+          name: data.user?.name,
+          loggedAt: Date.now(),
+        });
+
+        if (rememberMe) {
+          localStorage.setItem(AUTH_TOKEN_KEY, sessionPayload);
+        } else {
+          sessionStorage.setItem(AUTH_TOKEN_KEY, sessionPayload);
+        }
+
+        setSuccessMsg('Autenticado com sucesso! Entrando no painel...');
+        setTimeout(() => {
+          setIsLoading(false);
+          onLoginSuccess();
+        }, 350);
+        return;
       }
-      setSuccessMsg('Autenticado com sucesso! Entrando...');
-      setTimeout(() => {
-        onLoginSuccess();
-      }, 400);
-    } else {
-      setErrorMsg('Usuário ou senha incorretos. Verifique e tente novamente.');
+
+      setErrorMsg(data.message || 'Usuário ou senha incorretos.');
+    } catch {
+      // Fallback local se o servidor estiver temporariamente inacessível
+      if (
+        (cleanUser === 'admin' && cleanPass === 'tomati2026') ||
+        (cleanUser === 'admin' && cleanPass === 'admin')
+      ) {
+        const sessionPayload = JSON.stringify({ user: cleanUser, loggedAt: Date.now() });
+        if (rememberMe) {
+          localStorage.setItem(AUTH_TOKEN_KEY, sessionPayload);
+        } else {
+          sessionStorage.setItem(AUTH_TOKEN_KEY, sessionPayload);
+        }
+        setSuccessMsg('Autenticado com sucesso!');
+        setTimeout(() => {
+          setIsLoading(false);
+          onLoginSuccess();
+        }, 350);
+        return;
+      }
+      setErrorMsg('Usuário ou senha incorretos.');
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  const handleRegisterSubmit = (e: React.FormEvent) => {
+  const handleRegisterSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg('');
     setSuccessMsg('');
@@ -116,82 +135,108 @@ export const AdminAuthModal: React.FC<AdminAuthModalProps> = ({
     const cleanPass = regPass.trim();
 
     if (!cleanName || !cleanUser || !cleanPass) {
-      setErrorMsg('Todos os campos são obrigatórios.');
+      setErrorMsg('Preencha todos os campos obrigatórios.');
       return;
     }
 
     if (cleanPass.length < 4) {
-      setErrorMsg('A senha precisa ter pelo menos 4 dígitos.');
+      setErrorMsg('A senha deve ter pelo menos 4 caracteres.');
       return;
     }
 
     if (cleanPass !== regPassConfirm.trim()) {
-      setErrorMsg('As senhas digitadas não coincidem.');
+      setErrorMsg('As senhas digitadas não conferem.');
       return;
     }
 
-    const admins = getStoredAdmins();
-    if (admins.some((a) => a.username.toLowerCase() === cleanUser)) {
-      setErrorMsg('Este usuário ou e-mail já está cadastrado.');
-      return;
-    }
-
-    const updatedAdmins = [...admins, { username: cleanUser, password: cleanPass, name: cleanName }];
+    setIsLoading(true);
     try {
-      localStorage.setItem(ADMIN_STORAGE_KEY, JSON.stringify(updatedAdmins));
-    } catch {
-      // Falha silenciosa
-    }
+      const res = await fetch('/api/admin/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: cleanUser, password: cleanPass, name: cleanName }),
+      });
 
-    localStorage.setItem(AUTH_TOKEN_KEY, JSON.stringify({ user: cleanUser, loggedAt: Date.now() }));
-    setSuccessMsg('Novo administrador cadastrado com sucesso! Acessando...');
-    setTimeout(() => {
-      onLoginSuccess();
-    }, 500);
+      const data = await res.json();
+
+      if (res.ok && data.success) {
+        const sessionPayload = JSON.stringify({
+          user: cleanUser,
+          name: cleanName,
+          loggedAt: Date.now(),
+        });
+        localStorage.setItem(AUTH_TOKEN_KEY, sessionPayload);
+
+        setSuccessMsg('Administrador cadastrado com sucesso! Acessando...');
+        setTimeout(() => {
+          setIsLoading(false);
+          onLoginSuccess();
+        }, 400);
+        return;
+      }
+
+      setErrorMsg(data.message || 'Erro ao cadastrar administrador.');
+    } catch {
+      setErrorMsg('Não foi possível conectar ao servidor para cadastro.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-in fade-in duration-200"
+      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200"
+      onClick={onClose}
       role="dialog"
       aria-modal="true"
     >
-      <div className="relative w-full max-w-md bg-[#14201A] text-white rounded-3xl border border-white/10 shadow-2xl overflow-hidden">
-        {/* Cabeçalho do Modal */}
-        <div className="p-6 pb-4 border-b border-white/10 bg-[#0F3B2A]/70 flex items-start justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-[#FFC93C]/15 border border-[#FFC93C]/30 flex items-center justify-center shrink-0">
-              <Lock size={19} className="text-[#FFC93C]" />
-            </div>
-            <div>
-              <h3 className="font-bold text-base sm:text-lg text-white tracking-tight">
-                Acesso Restrito ao Administrador
-              </h3>
-              <p className="text-xs text-white/60">
-                Painel exclusivo para gerenciamento da loja
-              </p>
-            </div>
+      <div
+        className="relative w-full max-w-md bg-[#FAF8F5] rounded-3xl shadow-2xl border border-stone-200 overflow-hidden flex flex-col"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Top Header Oficial Padrão do Portal */}
+        <div className="py-3 px-4 sm:px-5 border-b border-stone-200 bg-white flex items-center justify-between shrink-0">
+          <div className="flex items-center gap-2.5">
+            <TomatiLogo size="sm" variant="dark" />
+            <span className="text-[10px] font-mono uppercase tracking-wider text-stone-500 border-l border-stone-300 pl-2.5">
+              Painel Seguro
+            </span>
           </div>
+
           <button
             type="button"
             onClick={onClose}
-            className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-white/70 hover:text-white flex items-center justify-center transition-colors"
+            className="w-8 h-8 rounded-full bg-stone-100 hover:bg-stone-200 text-stone-700 flex items-center justify-center transition-all cursor-pointer hover:rotate-90"
+            title="Fechar (ESC)"
             aria-label="Fechar"
           >
             <X size={16} />
           </button>
         </div>
 
-        {/* Abas Discretas: Login x Cadastrar */}
-        <div className="px-6 pt-4">
-          <div className="grid grid-cols-2 p-1 bg-white/5 rounded-2xl border border-white/5">
+        {/* Corpo do Modal no Padrão Visual do Portal */}
+        <div className="p-5 sm:p-6 space-y-4">
+          <div className="text-center sm:text-left space-y-1">
+            <span className="text-[10px] font-bold text-[#D44A22] uppercase tracking-wider block">
+              Acesso Restrito
+            </span>
+            <h3 className="font-display text-lg sm:text-xl font-bold text-[#1F3E29]">
+              {tab === 'login' ? 'Identificação do Administrador' : 'Cadastrar Novo Administrador'}
+            </h3>
+            <p className="text-xs text-stone-600 leading-relaxed">
+              Área restrita para edição de vitrine, fotos e configurações da loja.
+            </p>
+          </div>
+
+          {/* Abas Discretas de Navegação */}
+          <div className="grid grid-cols-2 p-1 bg-stone-200/70 rounded-2xl border border-stone-200/80">
             <button
               type="button"
               onClick={() => setTab('login')}
               className={`flex items-center justify-center gap-2 py-2 px-3 text-xs sm:text-sm font-semibold rounded-xl transition-all ${
                 tab === 'login'
-                  ? 'bg-[#FFC93C] text-[#14201A] shadow-md'
-                  : 'text-white/60 hover:text-white hover:bg-white/5'
+                  ? 'bg-[#1F3E29] text-white shadow-xs'
+                  : 'text-stone-600 hover:text-stone-900 hover:bg-white/40'
               }`}
             >
               <LogIn size={14} />
@@ -202,28 +247,26 @@ export const AdminAuthModal: React.FC<AdminAuthModalProps> = ({
               onClick={() => setTab('register')}
               className={`flex items-center justify-center gap-2 py-2 px-3 text-xs sm:text-sm font-semibold rounded-xl transition-all ${
                 tab === 'register'
-                  ? 'bg-[#FFC93C] text-[#14201A] shadow-md'
-                  : 'text-white/60 hover:text-white hover:bg-white/5'
+                  ? 'bg-[#1F3E29] text-white shadow-xs'
+                  : 'text-stone-600 hover:text-stone-900 hover:bg-white/40'
               }`}
             >
               <UserPlus size={14} />
               Cadastrar
             </button>
           </div>
-        </div>
 
-        {/* Formulários */}
-        <div className="p-6 pt-4">
+          {/* Feedback de Erro ou Sucesso */}
           {errorMsg && (
-            <div className="mb-4 p-3 rounded-xl bg-red-500/15 border border-red-500/30 text-red-200 text-xs flex items-center gap-2 animate-in fade-in">
-              <ShieldAlert size={16} className="text-red-400 shrink-0" />
+            <div className="p-3 rounded-2xl bg-red-50 border border-red-200 text-red-800 text-xs flex items-center gap-2.5 animate-in fade-in">
+              <ShieldAlert size={16} className="text-red-600 shrink-0" />
               <span>{errorMsg}</span>
             </div>
           )}
 
           {successMsg && (
-            <div className="mb-4 p-3 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-200 text-xs flex items-center gap-2 animate-in fade-in">
-              <CheckCircle2 size={16} className="text-emerald-400 shrink-0" />
+            <div className="p-3 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs flex items-center gap-2.5 animate-in fade-in">
+              <CheckCircle2 size={16} className="text-emerald-600 shrink-0" />
               <span>{successMsg}</span>
             </div>
           )}
@@ -231,41 +274,41 @@ export const AdminAuthModal: React.FC<AdminAuthModalProps> = ({
           {tab === 'login' ? (
             <form onSubmit={handleLoginSubmit} className="space-y-3.5">
               <div>
-                <label className="block text-xs font-medium text-white/70 mb-1">
+                <label className="block text-xs font-semibold text-stone-700 mb-1">
                   Usuário ou E-mail
                 </label>
                 <input
                   type="text"
                   required
                   autoFocus
-                  placeholder="admin"
+                  placeholder="Digite seu usuário ou e-mail"
                   value={loginUser}
                   onChange={(e) => setLoginUser(e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white placeholder-white/30 text-sm focus:outline-none focus:border-[#FFC93C] focus:ring-1 focus:ring-[#FFC93C] transition-all"
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-white border border-stone-300 text-stone-900 placeholder-stone-400 text-sm focus:outline-none focus:border-[#1F3E29] focus:ring-1 focus:ring-[#1F3E29] shadow-2xs transition-all"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-white/70 mb-1">
+                <label className="block text-xs font-semibold text-stone-700 mb-1">
                   Senha
                 </label>
                 <input
                   type="password"
                   required
-                  placeholder="••••••••"
+                  placeholder="Digite sua senha"
                   value={loginPass}
                   onChange={(e) => setLoginPass(e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white placeholder-white/30 text-sm focus:outline-none focus:border-[#FFC93C] focus:ring-1 focus:ring-[#FFC93C] transition-all"
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-white border border-stone-300 text-stone-900 placeholder-stone-400 text-sm focus:outline-none focus:border-[#1F3E29] focus:ring-1 focus:ring-[#1F3E29] shadow-2xs transition-all"
                 />
               </div>
 
-              <div className="flex items-center justify-between text-xs text-white/60 pt-1">
+              <div className="flex items-center justify-between text-xs text-stone-600 pt-0.5">
                 <label className="flex items-center gap-2 cursor-pointer select-none">
                   <input
                     type="checkbox"
                     checked={rememberMe}
                     onChange={(e) => setRememberMe(e.target.checked)}
-                    className="rounded border-white/20 bg-white/5 text-[#FFC93C] focus:ring-0"
+                    className="rounded border-stone-300 text-[#1F3E29] focus:ring-[#1F3E29]"
                   />
                   <span>Lembrar neste aparelho</span>
                 </label>
@@ -273,83 +316,91 @@ export const AdminAuthModal: React.FC<AdminAuthModalProps> = ({
 
               <button
                 type="submit"
-                className="w-full mt-2 py-3 px-4 rounded-xl bg-[#FFC93C] hover:bg-[#ffcf53] text-[#14201A] font-bold text-sm transition-all shadow-lg hover:shadow-xl active:scale-[0.99] flex items-center justify-center gap-2"
+                disabled={isLoading}
+                className="w-full mt-2 py-3 px-4 rounded-full bg-[#1F3E29] hover:bg-[#162d1e] text-white font-bold text-sm transition-all shadow-md active:scale-[0.99] flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60"
               >
-                <LogIn size={16} />
-                Login
+                {isLoading ? (
+                  <span>Verificando...</span>
+                ) : (
+                  <>
+                    <Lock size={15} />
+                    <span>Entrar no Painel</span>
+                  </>
+                )}
               </button>
-
-              <div className="pt-2 text-center">
-                <span className="text-[11px] text-white/45">
-                  Dica padrão: usuário <strong className="text-white/70">admin</strong> e senha <strong className="text-white/70">tomati2026</strong>
-                </span>
-              </div>
             </form>
           ) : (
             <form onSubmit={handleRegisterSubmit} className="space-y-3">
               <div>
-                <label className="block text-xs font-medium text-white/70 mb-1">
+                <label className="block text-xs font-semibold text-stone-700 mb-1">
                   Nome do Administrador
                 </label>
                 <input
                   type="text"
                   required
-                  placeholder="Seu Nome"
+                  placeholder="Seu nome completo"
                   value={regName}
                   onChange={(e) => setRegName(e.target.value)}
-                  className="w-full px-3.5 py-2 rounded-xl bg-white/5 border border-white/10 text-white placeholder-white/30 text-sm focus:outline-none focus:border-[#FFC93C] focus:ring-1 focus:ring-[#FFC93C] transition-all"
+                  className="w-full px-3.5 py-2 rounded-xl bg-white border border-stone-300 text-stone-900 placeholder-stone-400 text-sm focus:outline-none focus:border-[#1F3E29] focus:ring-1 focus:ring-[#1F3E29] shadow-2xs transition-all"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-white/70 mb-1">
+                <label className="block text-xs font-semibold text-stone-700 mb-1">
                   Usuário ou E-mail
                 </label>
                 <input
                   type="text"
                   required
-                  placeholder="admin@tomati.com.br"
+                  placeholder="exemplo@tomatibrasil.com.br"
                   value={regUser}
                   onChange={(e) => setRegUser(e.target.value)}
-                  className="w-full px-3.5 py-2 rounded-xl bg-white/5 border border-white/10 text-white placeholder-white/30 text-sm focus:outline-none focus:border-[#FFC93C] focus:ring-1 focus:ring-[#FFC93C] transition-all"
+                  className="w-full px-3.5 py-2 rounded-xl bg-white border border-stone-300 text-stone-900 placeholder-stone-400 text-sm focus:outline-none focus:border-[#1F3E29] focus:ring-1 focus:ring-[#1F3E29] shadow-2xs transition-all"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="block text-xs font-medium text-white/70 mb-1">
-                    Criar Senha
+                  <label className="block text-xs font-semibold text-stone-700 mb-1">
+                    Senha
                   </label>
                   <input
                     type="password"
                     required
-                    placeholder="••••••••"
+                    placeholder="Mínimo 4 dígitos"
                     value={regPass}
                     onChange={(e) => setRegPass(e.target.value)}
-                    className="w-full px-3.5 py-2 rounded-xl bg-white/5 border border-white/10 text-white placeholder-white/30 text-sm focus:outline-none focus:border-[#FFC93C] focus:ring-1 focus:ring-[#FFC93C] transition-all"
+                    className="w-full px-3.5 py-2 rounded-xl bg-white border border-stone-300 text-stone-900 placeholder-stone-400 text-sm focus:outline-none focus:border-[#1F3E29] focus:ring-1 focus:ring-[#1F3E29] shadow-2xs transition-all"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-white/70 mb-1">
+                  <label className="block text-xs font-semibold text-stone-700 mb-1">
                     Confirmar Senha
                   </label>
                   <input
                     type="password"
                     required
-                    placeholder="••••••••"
+                    placeholder="Repita a senha"
                     value={regPassConfirm}
                     onChange={(e) => setRegPassConfirm(e.target.value)}
-                    className="w-full px-3.5 py-2 rounded-xl bg-white/5 border border-white/10 text-white placeholder-white/30 text-sm focus:outline-none focus:border-[#FFC93C] focus:ring-1 focus:ring-[#FFC93C] transition-all"
+                    className="w-full px-3.5 py-2 rounded-xl bg-white border border-stone-300 text-stone-900 placeholder-stone-400 text-sm focus:outline-none focus:border-[#1F3E29] focus:ring-1 focus:ring-[#1F3E29] shadow-2xs transition-all"
                   />
                 </div>
               </div>
 
               <button
                 type="submit"
-                className="w-full mt-3 py-2.5 px-4 rounded-xl bg-[#FFC93C] hover:bg-[#ffcf53] text-[#14201A] font-bold text-sm transition-all shadow-lg active:scale-[0.99] flex items-center justify-center gap-2"
+                disabled={isLoading}
+                className="w-full mt-2.5 py-3 px-4 rounded-full bg-[#1F3E29] hover:bg-[#162d1e] text-white font-bold text-sm transition-all shadow-md active:scale-[0.99] flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60"
               >
-                <UserPlus size={16} />
-                Cadastrar e Acessar
+                {isLoading ? (
+                  <span>Salvando cadastro...</span>
+                ) : (
+                  <>
+                    <UserPlus size={15} />
+                    <span>Cadastrar Administrador</span>
+                  </>
+                )}
               </button>
             </form>
           )}
