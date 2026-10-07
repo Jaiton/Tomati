@@ -842,6 +842,7 @@ export const ClaudeWowPreview: React.FC<any> = () => {
               type="button"
               onClick={handleOpenAdmin}
               aria-label="Acesso restrito ao painel da loja"
+              style={{ textDecoration: 'none', border: 'none', outline: 'none', background: 'transparent' }}
             >
               Painel da loja
             </button>
@@ -1263,6 +1264,7 @@ export const ClaudeWowPreview: React.FC<any> = () => {
           setIsAuthModalOpen(false);
           setIsAdminOpen(true);
         }}
+        logoUrl={data.img?.logo || '/logo_tomati_light.svg'}
       />
     </div>
   );

@@ -6,6 +6,7 @@ interface AdminAuthModalProps {
   isOpen: boolean;
   onClose: () => void;
   onLoginSuccess: () => void;
+  logoUrl?: string;
 }
 
 const AUTH_TOKEN_KEY = 'tomati_admin_session_v1';
@@ -14,6 +15,7 @@ export const AdminAuthModal: React.FC<AdminAuthModalProps> = ({
   isOpen,
   onClose,
   onLoginSuccess,
+  logoUrl,
 }) => {
   const [tab, setTab] = useState<'login' | 'register'>('login');
 
@@ -191,14 +193,20 @@ export const AdminAuthModal: React.FC<AdminAuthModalProps> = ({
       aria-modal="true"
     >
       <div
-        className="relative w-full max-w-md bg-[#FAF8F5] rounded-3xl shadow-2xl border border-stone-200 overflow-hidden flex flex-col"
+        className="relative w-full max-w-md bg-[#FAF8F5] rounded-3xl shadow-2xl border border-stone-200 overflow-hidden flex flex-col max-h-[92vh]"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Top Header Oficial Padrão do Portal */}
-        <div className="py-3 px-4 sm:px-5 border-b border-stone-200 bg-white flex items-center justify-between shrink-0">
-          <div className="flex items-center gap-2.5">
-            <TomatiLogo size="sm" variant="dark" />
-            <span className="text-[10px] font-mono uppercase tracking-wider text-stone-500 border-l border-stone-300 pl-2.5">
+        {/* Top Header Oficial Padrão do Sistema (Verde Escuro #14201A) */}
+        <div className="py-3.5 px-4 sm:px-5 bg-[#14201A] border-b border-white/10 flex items-center justify-between shrink-0">
+          <div className="flex items-center gap-3">
+            <div className="logo shrink-0" style={{ flexShrink: 0, minWidth: 'max-content' }}>
+              <img
+                src={logoUrl || '/logo_tomati_light.svg'}
+                alt="Tomati Oficial"
+                style={{ height: '32px', width: 'auto', display: 'block', flexShrink: 0 }}
+              />
+            </div>
+            <span className="text-[10px] font-mono uppercase tracking-wider text-white/60 border-l border-white/20 pl-2.5">
               Painel Seguro
             </span>
           </div>
@@ -206,7 +214,7 @@ export const AdminAuthModal: React.FC<AdminAuthModalProps> = ({
           <button
             type="button"
             onClick={onClose}
-            className="w-8 h-8 rounded-full bg-stone-100 hover:bg-stone-200 text-stone-700 flex items-center justify-center transition-all cursor-pointer hover:rotate-90"
+            className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-all cursor-pointer hover:rotate-90"
             title="Fechar (ESC)"
             aria-label="Fechar"
           >
@@ -215,12 +223,13 @@ export const AdminAuthModal: React.FC<AdminAuthModalProps> = ({
         </div>
 
         {/* Corpo do Modal no Padrão Visual do Portal */}
-        <div className="p-5 sm:p-6 space-y-4">
+        <div className="p-5 sm:p-6 space-y-4 overflow-y-auto">
           <div className="text-center sm:text-left space-y-1">
-            <span className="text-[10px] font-bold text-[#D44A22] uppercase tracking-wider block">
-              Acesso Restrito
-            </span>
-            <h3 className="font-display text-lg sm:text-xl font-bold text-[#1F3E29]">
+            <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-red-100/90 border border-red-200 text-[#D44A22] text-[11px] font-bold tracking-wide uppercase">
+              <Lock size={12} className="shrink-0" />
+              <span>Acesso Restrito ao Administrador</span>
+            </div>
+            <h3 className="font-display text-lg sm:text-xl font-bold text-[#1F3E29] pt-1">
               {tab === 'login' ? 'Identificação do Administrador' : 'Cadastrar Novo Administrador'}
             </h3>
             <p className="text-xs text-stone-600 leading-relaxed">
@@ -323,8 +332,8 @@ export const AdminAuthModal: React.FC<AdminAuthModalProps> = ({
                   <span>Verificando...</span>
                 ) : (
                   <>
-                    <Lock size={15} />
-                    <span>Entrar no Painel</span>
+                    <LogIn size={16} />
+                    <span>Login</span>
                   </>
                 )}
               </button>
@@ -359,33 +368,32 @@ export const AdminAuthModal: React.FC<AdminAuthModalProps> = ({
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="block text-xs font-semibold text-stone-700 mb-1">
-                    Senha
-                  </label>
-                  <input
-                    type="password"
-                    required
-                    placeholder="Mínimo 4 dígitos"
-                    value={regPass}
-                    onChange={(e) => setRegPass(e.target.value)}
-                    className="w-full px-3.5 py-2 rounded-xl bg-white border border-stone-300 text-stone-900 placeholder-stone-400 text-sm focus:outline-none focus:border-[#1F3E29] focus:ring-1 focus:ring-[#1F3E29] shadow-2xs transition-all"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-stone-700 mb-1">
-                    Confirmar Senha
-                  </label>
-                  <input
-                    type="password"
-                    required
-                    placeholder="Repita a senha"
-                    value={regPassConfirm}
-                    onChange={(e) => setRegPassConfirm(e.target.value)}
-                    className="w-full px-3.5 py-2 rounded-xl bg-white border border-stone-300 text-stone-900 placeholder-stone-400 text-sm focus:outline-none focus:border-[#1F3E29] focus:ring-1 focus:ring-[#1F3E29] shadow-2xs transition-all"
-                  />
-                </div>
+              <div>
+                <label className="block text-xs font-semibold text-stone-700 mb-1">
+                  Senha
+                </label>
+                <input
+                  type="password"
+                  required
+                  placeholder="Crie sua senha (mínimo 4 caracteres)"
+                  value={regPass}
+                  onChange={(e) => setRegPass(e.target.value)}
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-white border border-stone-300 text-stone-900 placeholder-stone-400 text-sm focus:outline-none focus:border-[#1F3E29] focus:ring-1 focus:ring-[#1F3E29] shadow-2xs transition-all"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-stone-700 mb-1">
+                  Confirmar Senha
+                </label>
+                <input
+                  type="password"
+                  required
+                  placeholder="Repita a senha digitada"
+                  value={regPassConfirm}
+                  onChange={(e) => setRegPassConfirm(e.target.value)}
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-white border border-stone-300 text-stone-900 placeholder-stone-400 text-sm focus:outline-none focus:border-[#1F3E29] focus:ring-1 focus:ring-[#1F3E29] shadow-2xs transition-all"
+                />
               </div>
 
               <button
