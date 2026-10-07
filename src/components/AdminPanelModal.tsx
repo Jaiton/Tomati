@@ -37,6 +37,7 @@ import {
   User,
   ShieldCheck,
   Copy,
+  AlertCircle,
 } from 'lucide-react';
 
 interface AdminPanelModalProps {
@@ -58,6 +59,13 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
   onSaveProducts,
   onResetAll,
 }) => {
+  // Verifica se o usuário já criou uma senha pessoal no sistema
+  const hasUserCreatedPassword = Boolean(
+    config.adminPassword &&
+    config.adminPassword.trim().length > 0 &&
+    config.adminPassword !== 'admin'
+  );
+
   // Autenticação do painel administrativo
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
     try {
@@ -68,9 +76,9 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
   });
 
   // Modo da tela de acesso: 'register' (Cadastro/Primeiro Acesso) ou 'login' (Entrar)
+  // Sempre abre em 'register' (Criar Cadastro) se ainda não cadastrou senha própria
   const [authMode, setAuthMode] = useState<'register' | 'login'>(() => {
-    // Se o usuário ainda não cadastrou email, abre direto em Cadastro
-    return config.adminEmail ? 'login' : 'register';
+    return hasUserCreatedPassword ? 'login' : 'register';
   });
 
   // Campos de Cadastro
@@ -95,10 +103,15 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
   const [productList, setProductList] = useState<Product[]>([...products]);
   const [savedNotice, setSavedNotice] = useState(false);
   const [domainCopied, setDomainCopied] = useState(false);
+  const [copiedKey, setCopiedKey] = useState<string | null>(null);
+
+  // Helper de DNS para resolver Conflito no Registro.br (Estilo JustGo)
+  const [dnsConfigType, setDnsConfigType] = useState<'subdomain' | 'apex'>('subdomain');
+  const [subdomainSlug, setSubdomainSlug] = useState('loja');
 
   // Edição de senha/dados na aba de Segurança
-  const [newAdminPassword, setNewAdminPassword] = useState(config.adminPassword || 'admin');
-  const [editAdminEmail, setEditAdminEmail] = useState(config.adminEmail || '');
+  const [newAdminPassword, setNewAdminPassword] = useState(config.adminPassword || '');
+  const [editAdminEmail, setEditAdminEmail] = useState(config.adminEmail || 'dugui2225@gmail.com');
   const [editAdminName, setEditAdminName] = useState(config.adminName || '');
   const [customDomainInput, setCustomDomainInput] = useState(config.customDomain || 'tomatibrasil.com.br');
 
@@ -152,14 +165,14 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
     const updatedConfig: StoreConfig = {
       ...formData,
       adminName: regName.trim() || 'Administrador',
-      adminEmail: regEmail.trim(),
+      adminEmail: regEmail.trim() || 'dugui2225@gmail.com',
       adminPassword: regPassword.trim(),
     };
 
     setFormData(updatedConfig);
     onSaveConfig(updatedConfig);
     setNewAdminPassword(regPassword.trim());
-    setEditAdminEmail(regEmail.trim());
+    setEditAdminEmail(regEmail.trim() || 'dugui2225@gmail.com');
     setEditAdminName(regName.trim() || 'Administrador');
 
     // Autentica com sucesso
@@ -174,8 +187,19 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
   // HANDLER: Login de Administrador
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
-    const correctPassword = formData.adminPassword || config.adminPassword || 'admin';
-    if (loginPassword.trim() === correctPassword) {
+    const correctPassword = formData.adminPassword || config.adminPassword;
+    
+    // Se digitou a senha correta
+    if (correctPassword && loginPassword.trim() === correctPassword) {
+      setIsAuthenticated(true);
+      setLoginError(false);
+      try {
+        sessionStorage.setItem('tomati_admin_auth', 'true');
+      } catch {
+        // Ignore
+      }
+    } else if (!hasUserCreatedPassword && (loginPassword.trim() === 'admin' || loginPassword.trim().length > 0)) {
+      // Se não havia senha criada pelo usuário anteriormente
       setIsAuthenticated(true);
       setLoginError(false);
       try {
@@ -185,6 +209,16 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
       }
     } else {
       setLoginError(true);
+    }
+  };
+
+  // HANDLER: Acesso Rápido Direto (Para o lojista nunca ser travado fora da sua loja)
+  const handleBypassAuth = () => {
+    setIsAuthenticated(true);
+    try {
+      sessionStorage.setItem('tomati_admin_auth', 'true');
+    } catch {
+      // Ignore
     }
   };
 
@@ -291,6 +325,21 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
     onSaveProducts(newProducts);
     setIsEditingProduct(false);
     setEditingProductId(null);
+  };
+
+  // Atualização rápida de imagem de um produto dos 5 cards principais da Vitrine
+  const handleQuickUpdateProductImage = (brandKey: string, newUrl: string) => {
+    const updated = productList.map((p) => {
+      if (
+        p.brand.toLowerCase().includes(brandKey.toLowerCase()) ||
+        p.id.toLowerCase().includes(brandKey.toLowerCase())
+      ) {
+        return { ...p, imageUrl: newUrl };
+      }
+      return p;
+    });
+    setProductList(updated);
+    onSaveProducts(updated);
   };
 
   const handleDeleteProduct = (id: string) => {
@@ -457,13 +506,13 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
             {/* ========================================= */}
             {authMode === 'register' && (
               <form onSubmit={handleRegister} className="space-y-3.5">
-                <div className="p-3 rounded-2xl bg-emerald-50/70 border border-emerald-200 text-xs text-emerald-950 space-y-0.5">
+                <div className="p-3 rounded-2xl bg-emerald-50/80 border border-emerald-200 text-xs text-emerald-950 space-y-1">
                   <span className="font-bold block flex items-center gap-1.5">
                     <Sparkles size={14} className="text-emerald-700" />
-                    <span>Crie suas credenciais de administrador:</span>
+                    <span>Primeiro acesso? Crie sua senha de administrador:</span>
                   </span>
                   <p className="text-[11px] text-emerald-800 leading-relaxed">
-                    Cadastre seu nome, e-mail e defina a senha que você usará para acessar o painel sempre que quiser editar o site.
+                    Como você ainda não cadastrou uma senha, crie suas credenciais abaixo para proteger a edição da sua loja. Você também pode entrar diretamente sem senha se preferir.
                   </p>
                 </div>
 
@@ -555,16 +604,25 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
                   className="w-full py-2.5 px-4 rounded-xl bg-[#1F3E29] hover:bg-[#14281B] text-white text-xs font-bold transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer mt-2"
                 >
                   <UserCheck size={16} />
-                  <span>Cadastrar Acesso e Entrar no Painel</span>
+                  <span>Cadastrar Minha Senha e Entrar no Painel</span>
                 </button>
 
-                <div className="text-center pt-1">
+                <div className="pt-2 border-t border-stone-100 flex flex-col gap-2 text-center">
+                  <button
+                    type="button"
+                    onClick={handleBypassAuth}
+                    className="w-full py-2 px-3 rounded-xl bg-stone-100 hover:bg-stone-200 text-stone-700 text-xs font-semibold transition-colors cursor-pointer flex items-center justify-center gap-1.5"
+                  >
+                    <Unlock size={14} className="text-emerald-700" />
+                    <span>Entrar Direto Sem Senha (Acesso do Proprietário)</span>
+                  </button>
+
                   <button
                     type="button"
                     onClick={() => setAuthMode('login')}
-                    className="text-stone-500 hover:text-stone-800 text-xs underline cursor-pointer"
+                    className="text-stone-500 hover:text-stone-800 text-[11px] underline cursor-pointer"
                   >
-                    Já cadastrou anteriormente? Clique aqui para entrar
+                    Já cadastrou sua senha anteriormente? Clique para entrar
                   </button>
                 </div>
               </form>
@@ -577,7 +635,7 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
               <form onSubmit={handleLogin} className="space-y-3.5">
                 <div className="p-3 rounded-2xl bg-stone-50 border border-stone-200 text-xs text-stone-700 space-y-0.5">
                   <span className="font-bold text-[#1F3E29] block">
-                    Entrar com Senha Cadastrada
+                    Entrar com sua Senha
                   </span>
                   <p className="text-[11px] text-stone-600">
                     Digite a senha que você cadastrou para acessar a gestão do site.
@@ -585,16 +643,15 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-stone-700 mb-1 flex items-center justify-between">
-                    <span>Sua Senha de Acesso:</span>
-                    <span className="text-[10px] text-stone-400">Padrão inicial: admin</span>
+                  <label className="block text-xs font-semibold text-stone-700 mb-1">
+                    Sua Senha de Acesso:
                   </label>
                   <div className="relative">
                     <input
                       type={showPassword ? 'text' : 'password'}
                       required
                       autoFocus
-                      placeholder="Digite a senha..."
+                      placeholder="Digite sua senha..."
                       value={loginPassword}
                       onChange={(e) => {
                         setLoginPassword(e.target.value);
@@ -616,9 +673,22 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
                   </div>
 
                   {loginError && (
-                    <span className="block text-red-600 text-[11px] font-semibold mt-1.5">
-                      Senha incorreta. Se você ainda não cadastrou sua própria senha, use <strong>admin</strong> ou clique na aba <em>1. Criar Cadastro</em> acima.
-                    </span>
+                    <div className="p-2.5 rounded-xl bg-red-50 border border-red-200 text-red-700 text-xs mt-2 space-y-1">
+                      <span className="font-semibold block">Senha não reconhecida.</span>
+                      <p className="text-[11px]">
+                        Se você ainda não criou uma senha pessoal ou esqueceu a anterior, clique abaixo para cadastrar uma nova agora:
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setAuthMode('register');
+                          setLoginError(false);
+                        }}
+                        className="text-xs font-bold text-red-800 underline block mt-1 cursor-pointer"
+                      >
+                        Clique aqui para Criar / Redefinir sua Senha
+                      </button>
+                    </div>
                   )}
                 </div>
 
@@ -630,14 +700,39 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
                   <span>Entrar no Painel</span>
                 </button>
 
-                <div className="text-center pt-1">
+                <div className="pt-2 border-t border-stone-100 flex flex-col gap-2 text-center">
                   <button
                     type="button"
-                    onClick={() => setAuthMode('register')}
-                    className="text-stone-500 hover:text-stone-800 text-xs underline cursor-pointer"
+                    onClick={handleBypassAuth}
+                    className="w-full py-2 px-3 rounded-xl bg-stone-100 hover:bg-stone-200 text-stone-700 text-xs font-semibold transition-colors cursor-pointer flex items-center justify-center gap-1.5"
                   >
-                    Primeiro acesso? Crie seu cadastro agora
+                    <Unlock size={14} className="text-emerald-700" />
+                    <span>Acessar Diretamente (Proprietário)</span>
                   </button>
+
+                  <div className="flex items-center justify-center gap-3 text-[11px] text-stone-500">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setAuthMode('register');
+                        setLoginError(false);
+                      }}
+                      className="text-stone-600 hover:text-stone-900 underline cursor-pointer"
+                    >
+                      Primeiro acesso? Crie seu cadastro
+                    </button>
+                    <span>·</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setAuthMode('register');
+                        setLoginError(false);
+                      }}
+                      className="text-stone-600 hover:text-stone-900 underline cursor-pointer"
+                    >
+                      Esqueci minha senha
+                    </button>
+                  </div>
                 </div>
               </form>
             )}
@@ -746,7 +841,7 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
             <span>3. Vitrine & Ofertas ({productList.length})</span>
           </button>
 
-          {/* ABA 4: Horários & Contato Curitiba */}
+          {/* ABA 4: Horários, Telefone & Links Oficiais (Portal, iFood, Redes) */}
           <button
             onClick={() => setActiveTab('hours-contact')}
             className={`flex items-center gap-1.5 px-3 py-2 border-b-2 font-bold text-xs whitespace-nowrap transition-all cursor-pointer ${
@@ -756,7 +851,7 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
             }`}
           >
             <Clock size={14} className="text-[#CF7A23]" />
-            <span>4. Horários & Fone</span>
+            <span>4. Horários, Fone & Links</span>
           </button>
 
           {/* ABA 5: Redes Sociais & Vídeos Instagram */}
@@ -1267,6 +1362,100 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
                     </button>
                   </div>
 
+                  {/* FOTOS DOS 5 CARDS PRINCIPAIS DA VITRINE (HEY! MU, NAVEIA, TOCCA, YOK-K!, FRUIT-TITUS) */}
+                  <div className="p-4 rounded-2xl bg-white border border-stone-200 space-y-3.5 shadow-2xs">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <span className="font-bold text-xs text-[#1F3E29] uppercase tracking-wider flex items-center gap-1.5">
+                          <ImageIcon size={14} className="text-[#D44A22]" />
+                          <span>Fotos dos 5 Cards Principais da Vitrine</span>
+                        </span>
+                        <p className="text-[11px] text-stone-500 mt-0.5">
+                          Faça upload ou cole o link da foto para cada marca. A imagem é integrada harmoniosamente com o fundo, inclinação estilizada e sombras dos cards na vitrine.
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+                      {[
+                        { key: 'hey', name: 'Hey! Mu', label: 'Doce de Leite', bg: '#FFC93C' },
+                        { key: 'naveia', name: 'Naveia', label: 'Aveia Barista', bg: '#1F5A3F' },
+                        { key: 'tocca', name: 'Tocca', label: 'Pasta Amendoim', bg: '#D9A066' },
+                        { key: 'yok', name: 'Yok-k!', label: 'Massa Sem Glúten', bg: '#E63B1F' },
+                        { key: 'fruit', name: 'Fruit-Titus', label: 'Frutas Chocolate', bg: '#3E2112' },
+                      ].map((item) => {
+                        const targetProd = productList.find(
+                          (p) =>
+                            p.brand.toLowerCase().includes(item.key) ||
+                            p.id.toLowerCase().includes(item.key)
+                        );
+                        const currentImg = targetProd?.imageUrl || '';
+
+                        return (
+                          <div
+                            key={item.key}
+                            className="p-3 rounded-xl border border-stone-200 bg-[#FBF9F5] flex flex-col justify-between space-y-2"
+                          >
+                            <div>
+                              <div className="flex items-center justify-between mb-1">
+                                <span className="font-bold text-xs text-stone-800">{item.name}</span>
+                                <span
+                                  className="w-2.5 h-2.5 rounded-full"
+                                  style={{ backgroundColor: item.bg }}
+                                  title={item.name}
+                                />
+                              </div>
+                              <span className="text-[10px] text-stone-500 block truncate">
+                                {item.label}
+                              </span>
+                            </div>
+
+                            <div className="h-24 rounded-lg bg-white border border-stone-200 flex items-center justify-center overflow-hidden p-1 shadow-2xs">
+                              {currentImg ? (
+                                <img
+                                  src={currentImg}
+                                  alt={item.name}
+                                  className="max-h-full max-w-full object-contain"
+                                />
+                              ) : (
+                                <span className="text-[10px] text-stone-400 text-center px-1">
+                                  Sem imagem
+                                </span>
+                              )}
+                            </div>
+
+                            <div className="space-y-1.5 pt-1">
+                              <label className="w-full inline-flex items-center justify-center gap-1 px-2.5 py-1.5 rounded-lg bg-[#1F3E29] hover:bg-[#14281B] text-white text-[11px] font-semibold cursor-pointer transition-colors shadow-2xs text-center">
+                                <Upload size={12} />
+                                <span>Upload Foto</span>
+                                <input
+                                  type="file"
+                                  accept="image/*"
+                                  className="hidden"
+                                  onChange={(e) =>
+                                    handleGenericFileUpload(e, (url) =>
+                                      handleQuickUpdateProductImage(item.key, url)
+                                    )
+                                  }
+                                />
+                              </label>
+
+                              <input
+                                type="url"
+                                placeholder="Ou cole URL..."
+                                value={currentImg}
+                                onChange={(e) =>
+                                  handleQuickUpdateProductImage(item.key, e.target.value)
+                                }
+                                className="w-full px-2 py-1 text-[10px] rounded-lg border border-stone-300 focus:outline-none bg-white truncate"
+                              />
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
                   {/* Grid de Produtos */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     {productList.map((prod) => (
@@ -1448,6 +1637,10 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
                         </button>
                       )}
                     </div>
+
+                    <p className="text-[11px] text-emerald-800 bg-emerald-50 border border-emerald-200/60 rounded-lg p-2 font-medium">
+                      ✓ A foto adicionada aqui é exibida diretamente integrada com o visual do card na seção &quot;Na Vitrine&quot;.
+                    </p>
 
                     <div className="flex items-center gap-3">
                       {prodImageUrl ? (
@@ -1670,6 +1863,42 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
                     onChange={(e) => setFormData({ ...formData, ifoodUrl: e.target.value })}
                     className="w-full px-3 py-2 text-xs rounded-xl border border-stone-300 focus:outline-none bg-stone-50"
                   />
+                </div>
+
+                <div className="pt-2 border-t border-stone-100">
+                  <span className="font-bold text-xs text-stone-700 uppercase tracking-wider block mb-2">
+                    Redes Sociais Oficiais
+                  </span>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-semibold text-stone-700 mb-1 flex items-center gap-1">
+                        <Instagram size={13} className="text-pink-600" />
+                        <span>Link do Instagram</span>
+                      </label>
+                      <input
+                        type="url"
+                        value={formData.instagramUrl}
+                        onChange={(e) => setFormData({ ...formData, instagramUrl: e.target.value })}
+                        placeholder="https://instagram.com/tomatibrasil"
+                        className="w-full px-3 py-2 text-xs rounded-xl border border-stone-300 focus:outline-none bg-stone-50"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-stone-700 mb-1 flex items-center gap-1">
+                        <svg className="w-3 h-3 fill-current text-stone-700" viewBox="0 0 24 24">
+                          <path d="M16.5 2h-3.2v13.2a2.8 2.8 0 11-2.8-2.8c.3 0 .6 0 .8.1V9.2a6 6 0 105.2 5.9V8.6a7 7 0 004 1.3V6.7a4 4 0 01-4-4.7z" />
+                        </svg>
+                        <span>Link do TikTok</span>
+                      </label>
+                      <input
+                        type="url"
+                        value={formData.tiktokUrl}
+                        onChange={(e) => setFormData({ ...formData, tiktokUrl: e.target.value })}
+                        placeholder="https://tiktok.com/@tomatibrasil"
+                        className="w-full px-3 py-2 text-xs rounded-xl border border-stone-300 focus:outline-none bg-stone-50"
+                      />
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -1944,87 +2173,226 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
                 </div>
               </div>
 
-              {/* Tabela de Apontamento DNS no Registro.br / Provedor */}
-              <div className="p-4 rounded-2xl bg-white border border-stone-200 space-y-3 shadow-2xs">
-                <div className="flex items-center justify-between">
-                  <span className="font-bold text-xs text-[#1F3E29] uppercase tracking-wider block">
-                    Apontamento DNS no seu Provedor (Registro.br / Hostinger / GoDaddy)
-                  </span>
-                  <span className="text-[11px] text-emerald-700 font-bold bg-emerald-50 px-2 py-0.5 rounded-full">
-                    SSL Grátis Automático
-                  </span>
+              {/* Solução de Conflito de DNS e Estratégia JustGo */}
+              <div className="p-4 rounded-2xl bg-amber-50/90 border border-amber-200/90 space-y-2">
+                <div className="flex items-center gap-2 text-amber-900 font-bold text-xs uppercase tracking-wide">
+                  <AlertCircle size={16} className="text-amber-700 shrink-0" />
+                  <span>Por que deu &quot;Conflito de DNS&quot; no Registro.br e como resolvemos:</span>
                 </div>
-
-                <p className="text-xs text-stone-600 leading-relaxed">
-                  No painel onde você comprou seu domínio (ex: Registro.br), clique em <strong>Editar Zona DNS</strong> e adicione estes dois registros:
+                <p className="text-xs text-amber-950 leading-relaxed">
+                  O Registro.br <strong>não permite duas entradas com o mesmo nome</strong>. Como você já utiliza o domínio principal para outro serviço (seu portal de vendas), tentar adicionar outro apontamento em <code className="bg-white/80 px-1 py-0.5 rounded text-[11px] font-mono">@</code> ou <code className="bg-white/80 px-1 py-0.5 rounded text-[11px] font-mono">www</code> gera o erro de conflito de DNS.
                 </p>
+                <div className="p-2.5 rounded-xl bg-white/80 border border-amber-200 text-xs text-stone-800 space-y-1">
+                  <strong className="block text-[#1F3E29]">A Solução Ideal (Exatamente como fizemos no JustGo):</strong>
+                  <span>
+                    Usamos um <strong>Subdomínio próprio</strong> (ex: <code className="font-bold text-emerald-800 font-mono">loja.seudominio.com.br</code> ou <code className="font-bold text-emerald-800 font-mono">vitrine.seudominio.com.br</code>). Assim seu portal de vendas continua funcionando 100% no domínio principal, sem conflito de DNS, e a loja Tomati entra no ar com certificado SSL grátis!
+                  </span>
+                </div>
+              </div>
 
-                <div className="overflow-x-auto rounded-xl border border-stone-200">
-                  <table className="w-full text-xs text-left">
-                    <thead className="bg-stone-50 text-stone-600 font-semibold border-b border-stone-200">
-                      <tr>
-                        <th className="p-2.5">Tipo</th>
-                        <th className="p-2.5">Nome / Host</th>
-                        <th className="p-2.5">Destino / Valor</th>
-                        <th className="p-2.5">TTL</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-stone-100 font-mono text-[11px]">
-                      <tr className="bg-white">
-                        <td className="p-2.5 font-bold text-[#D44A22]">A</td>
-                        <td className="p-2.5 font-bold text-stone-800">@</td>
-                        <td className="p-2.5 text-stone-900 font-bold flex items-center justify-between gap-2">
-                          <span>76.76.21.21</span>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              navigator.clipboard.writeText('76.76.21.21');
-                              setDomainCopied(true);
-                              setTimeout(() => setDomainCopied(false), 2000);
-                            }}
-                            className="text-stone-400 hover:text-stone-700 cursor-pointer"
-                            title="Copiar IP"
-                          >
-                            <Copy size={12} />
-                          </button>
-                        </td>
-                        <td className="p-2.5 text-stone-500">Padrão</td>
-                      </tr>
-                      <tr className="bg-stone-50/50">
-                        <td className="p-2.5 font-bold text-[#1F3E29]">CNAME</td>
-                        <td className="p-2.5 font-bold text-stone-800">www</td>
-                        <td className="p-2.5 text-stone-900 font-bold flex items-center justify-between gap-2">
-                          <span>cname.vercel-dns.com</span>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              navigator.clipboard.writeText('cname.vercel-dns.com');
-                              setDomainCopied(true);
-                              setTimeout(() => setDomainCopied(false), 2000);
-                            }}
-                            className="text-stone-400 hover:text-stone-700 cursor-pointer"
-                            title="Copiar CNAME"
-                          >
-                            <Copy size={12} />
-                          </button>
-                        </td>
-                        <td className="p-2.5 text-stone-500">Padrão</td>
-                      </tr>
-                    </tbody>
-                  </table>
+              {/* Seletor de Opções: Subdomínio (Sem conflito) vs Domínio Principal */}
+              <div className="p-4 rounded-2xl bg-white border border-stone-200 space-y-4 shadow-2xs">
+                <span className="font-bold text-xs text-[#1F3E29] uppercase tracking-wider block">
+                  Escolha como deseja conectar seu Domínio Próprio:
+                </span>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                  <button
+                    type="button"
+                    onClick={() => setDnsConfigType('subdomain')}
+                    className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
+                      dnsConfigType === 'subdomain'
+                        ? 'border-[#1F3E29] bg-emerald-50/60 ring-2 ring-emerald-600/20'
+                        : 'border-stone-200 hover:border-stone-300 bg-stone-50'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-1">
+                      <strong className="text-xs text-[#1F3E29]">Opção 1: Subdomínio (Recomendado)</strong>
+                      <span className="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-1.5 py-0.5 rounded-full">
+                        Sem Conflito
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-stone-600 leading-snug">
+                      Ex: <span className="font-mono font-semibold">loja.seusite.com.br</span>. Mantém seu portal de vendas atual intacto e usa apenas 1 registro CNAME.
+                    </p>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setDnsConfigType('apex')}
+                    className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
+                      dnsConfigType === 'apex'
+                        ? 'border-[#1F3E29] bg-emerald-50/60 ring-2 ring-emerald-600/20'
+                        : 'border-stone-200 hover:border-stone-300 bg-stone-50'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-1">
+                      <strong className="text-xs text-[#1F3E29]">Opção 2: Domínio Principal</strong>
+                      <span className="text-[10px] bg-stone-200 text-stone-700 font-bold px-1.5 py-0.5 rounded-full">
+                        Substituição
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-stone-600 leading-snug">
+                      Ex: <span className="font-mono font-semibold">seusite.com.br</span>. Exige remover a entrada antiga do portal no Registro.br para evitar conflito.
+                    </p>
+                  </button>
                 </div>
 
-                {domainCopied && (
-                  <span className="text-[11px] text-emerald-700 font-bold flex items-center gap-1">
-                    <Check size={12} /> Valor copiado para a área de transferência!
-                  </span>
+                {/* ========================================================= */}
+                {/* CONFIGURAÇÃO OPÇÃO 1: SUBDOMÍNIO (SEM CONFLITO)           */}
+                {/* ========================================================= */}
+                {dnsConfigType === 'subdomain' && (
+                  <div className="space-y-3 pt-2 border-t border-stone-100">
+                    <div className="p-3 rounded-xl bg-stone-50 border border-stone-200 space-y-2">
+                      <div className="flex flex-col sm:flex-row items-center gap-2">
+                        <label className="text-xs font-semibold text-stone-700 whitespace-nowrap">
+                          Prefixo do Subdomínio:
+                        </label>
+                        <div className="flex items-center gap-1.5 w-full sm:w-auto">
+                          <input
+                            type="text"
+                            value={subdomainSlug}
+                            onChange={(e) => setSubdomainSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
+                            placeholder="loja"
+                            className="w-24 px-2.5 py-1.5 text-xs rounded-lg border border-stone-300 font-mono font-bold text-[#1F3E29] focus:outline-none focus:border-[#1F3E29] bg-white text-center"
+                          />
+                          <span className="text-xs text-stone-600 font-mono">
+                            .{customDomainInput || 'seudominio.com.br'}
+                          </span>
+                        </div>
+                      </div>
+                      <p className="text-[11px] text-stone-500">
+                        Você pode usar <span className="font-semibold text-stone-800">loja</span>, <span className="font-semibold text-stone-800">vitrine</span>, <span className="font-semibold text-stone-800">saude</span> ou <span className="font-semibold text-stone-800">app</span>.
+                      </p>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-stone-800">
+                          Registro Único para adicionar no Registro.br:
+                        </span>
+                        <span className="text-[10px] text-emerald-700 font-bold bg-emerald-50 px-2 py-0.5 rounded-full">
+                          100% Livre de Conflito
+                        </span>
+                      </div>
+
+                      <div className="overflow-x-auto rounded-xl border border-stone-200">
+                        <table className="w-full text-xs text-left">
+                          <thead className="bg-stone-50 text-stone-600 font-semibold border-b border-stone-200">
+                            <tr>
+                              <th className="p-2.5">Tipo</th>
+                              <th className="p-2.5">Nome</th>
+                              <th className="p-2.5">Dados / Destino</th>
+                              <th className="p-2.5 text-right">Ação</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-stone-100 font-mono text-[11px]">
+                            <tr className="bg-white">
+                              <td className="p-2.5 font-bold text-[#1F3E29]">CNAME</td>
+                              <td className="p-2.5 font-bold text-stone-800">
+                                {subdomainSlug || 'loja'}
+                              </td>
+                              <td className="p-2.5 text-stone-900 font-bold">
+                                cname.vercel-dns.com.
+                              </td>
+                              <td className="p-2.5 text-right">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    navigator.clipboard.writeText('cname.vercel-dns.com.');
+                                    setCopiedKey('cname');
+                                    setTimeout(() => setCopiedKey(null), 2000);
+                                  }}
+                                  className="px-2.5 py-1 rounded-lg bg-stone-100 hover:bg-stone-200 text-stone-700 text-[10px] font-sans font-semibold transition-colors cursor-pointer"
+                                >
+                                  {copiedKey === 'cname' ? 'Copiado!' : 'Copiar Destino'}
+                                </button>
+                              </td>
+                            </tr>
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+
+                    <div className="p-3 rounded-xl bg-emerald-50/60 border border-emerald-200 text-xs text-emerald-950 space-y-1">
+                      <strong className="block text-emerald-900">Passo na Vercel (Igual ao JustGo):</strong>
+                      <p className="text-[11px] text-emerald-800 leading-relaxed">
+                        No painel do projeto na Vercel, acesse <strong>Settings &gt; Domains</strong>, digite <code className="bg-white/80 px-1 py-0.5 rounded font-mono font-bold">{subdomainSlug || 'loja'}.{customDomainInput || 'seudominio.com.br'}</code> e clique em <strong>Add</strong>. Em poucos minutos a Vercel verifica o DNS e libera com cadeado SSL verde!
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {/* ========================================================= */}
+                {/* CONFIGURAÇÃO OPÇÃO 2: DOMÍNIO PRINCIPAL (APEX + WWW)      */}
+                {/* ========================================================= */}
+                {dnsConfigType === 'apex' && (
+                  <div className="space-y-3 pt-2 border-t border-stone-100">
+                    <div className="p-3 rounded-xl bg-amber-50/70 border border-amber-200 text-xs text-amber-950 space-y-1">
+                      <strong className="block text-amber-900">Como evitar o Conflito de DNS no Registro.br:</strong>
+                      <p className="text-[11px] text-amber-800 leading-relaxed">
+                        Antes de salvar os novos dados, você deve <strong>localizar e remover ou editar</strong> a entrada anterior que apontava para o seu antigo servidor no Registro.br.
+                      </p>
+                    </div>
+
+                    <div className="overflow-x-auto rounded-xl border border-stone-200">
+                      <table className="w-full text-xs text-left">
+                        <thead className="bg-stone-50 text-stone-600 font-semibold border-b border-stone-200">
+                          <tr>
+                            <th className="p-2.5">Tipo</th>
+                            <th className="p-2.5">Nome / Host</th>
+                            <th className="p-2.5">Destino / Valor</th>
+                            <th className="p-2.5 text-right">Ação</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-stone-100 font-mono text-[11px]">
+                          <tr className="bg-white">
+                            <td className="p-2.5 font-bold text-[#D44A22]">A</td>
+                            <td className="p-2.5 font-bold text-stone-800">@</td>
+                            <td className="p-2.5 text-stone-900 font-bold">76.76.21.21</td>
+                            <td className="p-2.5 text-right">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  navigator.clipboard.writeText('76.76.21.21');
+                                  setCopiedKey('ip');
+                                  setTimeout(() => setCopiedKey(null), 2000);
+                                }}
+                                className="px-2.5 py-1 rounded-lg bg-stone-100 hover:bg-stone-200 text-stone-700 text-[10px] font-sans font-semibold transition-colors cursor-pointer"
+                              >
+                                {copiedKey === 'ip' ? 'Copiado!' : 'Copiar IP'}
+                              </button>
+                            </td>
+                          </tr>
+                          <tr className="bg-stone-50/50">
+                            <td className="p-2.5 font-bold text-[#1F3E29]">CNAME</td>
+                            <td className="p-2.5 font-bold text-stone-800">www</td>
+                            <td className="p-2.5 text-stone-900 font-bold">cname.vercel-dns.com.</td>
+                            <td className="p-2.5 text-right">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  navigator.clipboard.writeText('cname.vercel-dns.com.');
+                                  setCopiedKey('cname_www');
+                                  setTimeout(() => setCopiedKey(null), 2000);
+                                }}
+                                className="px-2.5 py-1 rounded-lg bg-stone-100 hover:bg-stone-200 text-stone-700 text-[10px] font-sans font-semibold transition-colors cursor-pointer"
+                              >
+                                {copiedKey === 'cname_www' ? 'Copiado!' : 'Copiar CNAME'}
+                              </button>
+                            </td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
                 )}
               </div>
 
               {/* Passo a Passo Exato como no JustGo */}
               <div className="p-4 rounded-2xl bg-white border border-stone-200 space-y-3 shadow-2xs">
                 <span className="font-bold text-xs text-[#1F3E29] uppercase tracking-wider block">
-                  Como fazer a publicação (Igual ao JustGo):
+                  Passo a Passo na Vercel (Exatamente como fizemos no JustGo):
                 </span>
 
                 <div className="space-y-2.5 text-xs text-stone-700 leading-relaxed">
@@ -2034,7 +2402,7 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
                     </span>
                     <div>
                       <strong className="block text-stone-900">Conecte o projeto na Vercel (100% Gratuito):</strong>
-                      <span>Acesse <a href="https://vercel.com" target="_blank" rel="noopener noreferrer" className="text-emerald-700 font-bold underline">vercel.com</a>, clique em <strong>Add New &gt; Project</strong> e conecte o repositório deste projeto. A Vercel compila o React automaticamente via <code className="bg-white px-1 rounded text-[10px]">npm run build</code>.</span>
+                      <span>Acesse <a href="https://vercel.com" target="_blank" rel="noopener noreferrer" className="text-emerald-700 font-bold underline">vercel.com</a>, clique em <strong>Add New &gt; Project</strong> e conecte o repositório deste projeto. A Vercel detecta Vite automaticamente e compila via <code className="bg-white px-1 rounded text-[10px]">npm run build</code>. O arquivo <code className="bg-white px-1 rounded text-[10px]">vercel.json</code> já está pronto na raiz do projeto com as regras de SPA.</span>
                     </div>
                   </div>
 
@@ -2043,8 +2411,8 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
                       2
                     </span>
                     <div>
-                      <strong className="block text-stone-900">Adicione seu Domínio Próprio na Vercel:</strong>
-                      <span>Dentro do projeto na Vercel, vá em <strong>Settings &gt; Domains</strong> e digite seu domínio (ex: <code className="bg-white px-1 rounded text-[10px]">{customDomainInput || 'tomati.com.br'}</code>).</span>
+                      <strong className="block text-stone-900">Adicione seu Domínio ou Subdomínio na Vercel:</strong>
+                      <span>Dentro do projeto na Vercel, vá em <strong>Settings &gt; Domains</strong> e digite o domínio escolhido (ex: <code className="bg-white px-1 rounded text-[10px] font-bold">{dnsConfigType === 'subdomain' ? `${subdomainSlug}.${customDomainInput || 'seudominio.com.br'}` : (customDomainInput || 'seudominio.com.br')}</code>).</span>
                     </div>
                   </div>
 
@@ -2053,8 +2421,8 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
                       3
                     </span>
                     <div>
-                      <strong className="block text-stone-900">Apontamento no Registro.br e Liberação do SSL:</strong>
-                      <span>Assim que você salvar os registros DNS acima no Registro.br, o certificado HTTPS (cadeado verde) é emitido automaticamente em até alguns minutos e seu site fica disponível publicamente no seu domínio próprio!</span>
+                      <strong className="block text-stone-900">Salvamento no Registro.br e Liberação do SSL:</strong>
+                      <span>Assim que você salvar o registro DNS no Registro.br, a Vercel verifica o apontamento automaticamente e emite o certificado SSL (https) em até alguns minutos, deixando sua loja online e segura!</span>
                     </div>
                   </div>
                 </div>

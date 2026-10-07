@@ -95,12 +95,12 @@ export const TomatiLogo: React.FC<TomatiLogoProps> = ({
   const circleTextColor = isLight ? '#1F3E29' : '#FFFFFF';
   const tomatoRed = variant === 'monochrome' ? greenColor : '#D44A22';
 
-  // Mapeamento de dimensões
+  // Mapeamento de dimensões (lg aumentado em ~40% para destaque limpo)
   const heightPx = {
     sm: 26,
     md: 34,
-    lg: 42,
-    xl: 56,
+    lg: 48,
+    xl: 58,
   }[size];
 
   // Se houver logo personalizada carregada no Admin

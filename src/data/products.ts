@@ -6,10 +6,10 @@ export const DEFAULT_STORE_CONFIG: StoreConfig = {
   missionCopy: 'Sua loja de saudabilidade com o equilíbrio perfeito entre suplementação, nutrição e sabor. Produtos selecionados para quem busca mais energia, bem-estar e performance no dia a dia — sem abrir mão do prazer de comer bem.',
   portalUrl: 'https://pedido.tomati.com.br',
   ifoodUrl: 'https://www.ifood.com.br/delivery/curitiba-pr/tomati-saudabilidade',
-  instagramUrl: 'https://instagram.com/tomati.oficial',
-  instagramHandle: '@tomati.oficial',
-  tiktokUrl: 'https://tiktok.com/@tomati.br',
-  tiktokHandle: '@tomati.br',
+  instagramUrl: 'https://instagram.com/tomatibrasil',
+  instagramHandle: '@tomatibrasil',
+  tiktokUrl: 'https://tiktok.com/@tomatibrasil',
+  tiktokHandle: '@tomatibrasil',
   whatsappUrl: 'https://wa.me/5541999998888?text=Olá!%20Vim%20pelo%20site%20da%20Tomati%20e%20gostaria%20de%20fazer%20meu%20pedido.',
   whatsappNumber: '(41) 99999-8888',
   phone: '(41) 99999-8888',
@@ -71,7 +71,8 @@ export const PRODUCTS: Product[] = [
     editorialHighlight: 'Toda a indulgência do doce de leite com a composição nutricional limpa que o seu corpo merece.',
     portalLink: 'https://pedido.tomati.com.br/produto/hey-mu-doce-de-leite',
     ifoodLink: 'https://www.ifood.com.br/delivery/sao-paulo-sp/tomati-saudabilidade',
-    accentColor: '#D47D22'
+    accentColor: '#D47D22',
+    imageUrl: 'https://images.unsplash.com/photo-1589301760014-d929f3979dbc?auto=format&fit=crop&w=700&q=80',
   },
   {
     id: 'naveia-bebida-vegetal-barista',
@@ -90,7 +91,8 @@ export const PRODUCTS: Product[] = [
     editorialHighlight: 'Cremosidade vegetal impecável para o seu café da manhã ou smoothie diário.',
     portalLink: 'https://pedido.tomati.com.br/produto/naveia-barista',
     ifoodLink: 'https://www.ifood.com.br/delivery/sao-paulo-sp/tomati-saudabilidade',
-    accentColor: '#2D583B'
+    accentColor: '#2D583B',
+    imageUrl: 'https://images.unsplash.com/photo-1550583724-b2692b85b150?auto=format&fit=crop&w=700&q=80',
   },
   {
     id: 'tocca-pasta-amendoim',
@@ -109,7 +111,8 @@ export const PRODUCTS: Product[] = [
     editorialHighlight: 'Crocância real em cada colherada. O combustível certo para quem busca performance.',
     portalLink: 'https://pedido.tomati.com.br/produto/tocca-pasta-amendoim',
     ifoodLink: 'https://www.ifood.com.br/delivery/sao-paulo-sp/tomati-saudabilidade',
-    accentColor: '#C4782A'
+    accentColor: '#C4782A',
+    imageUrl: 'https://images.unsplash.com/photo-1590080875515-8a3a8dc5735e?auto=format&fit=crop&w=700&q=80',
   },
   {
     id: 'yok-k-macarrao-sem-gluten',
@@ -128,7 +131,8 @@ export const PRODUCTS: Product[] = [
     editorialHighlight: 'Coma seu macarrão favorito sem sensação de cansaço ou peso depois da refeição.',
     portalLink: 'https://pedido.tomati.com.br/produto/yok-k-macarrao-sem-gluten',
     ifoodLink: 'https://www.ifood.com.br/delivery/sao-paulo-sp/tomati-saudabilidade',
-    accentColor: '#E05B35'
+    accentColor: '#E05B35',
+    imageUrl: 'https://images.unsplash.com/photo-1621996346565-e3d5d6281775?auto=format&fit=crop&w=700&q=80',
   },
   {
     id: 'fruit-titus-frutas-chocolate',
@@ -147,7 +151,8 @@ export const PRODUCTS: Product[] = [
     editorialHighlight: 'O crocante da fruta inteira com a intensidade do chocolate nobre. Doçura equilibrada.',
     portalLink: 'https://pedido.tomati.com.br/produto/fruit-titus-chocolate',
     ifoodLink: 'https://www.ifood.com.br/delivery/sao-paulo-sp/tomati-saudabilidade',
-    accentColor: '#4A2810'
+    accentColor: '#4A2810',
+    imageUrl: 'https://images.unsplash.com/photo-1606313564200-e75d5e30476c?auto=format&fit=crop&w=700&q=80',
   },
   {
     id: 'combo-rotina-performance',

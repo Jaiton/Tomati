@@ -45,6 +45,7 @@ export const OrderChannelModal: React.FC<OrderChannelModalProps> = ({
       onClick={onClose}
     >
       <div
+        id="order-channel-modal"
         className="relative w-full max-w-lg bg-[#FAF8F5] rounded-2xl sm:rounded-3xl shadow-2xl border border-stone-200 overflow-hidden flex flex-col my-auto max-h-[85vh] sm:max-h-[500px]"
         onClick={(e) => e.stopPropagation()}
       >

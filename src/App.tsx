@@ -4,26 +4,17 @@
  */
 
 import React, { useState } from 'react';
-import { Product, StoreConfig, PageView } from './types';
+import { Product, StoreConfig } from './types';
 import { DEFAULT_STORE_CONFIG, PRODUCTS as DEFAULT_PRODUCTS } from './data/products';
-import { Navbar } from './components/Navbar';
-import { HeroSection } from './components/HeroSection';
-import { ProductShowcase } from './components/ProductShowcase';
-import { StorySection } from './components/StorySection';
-import { WhereToBuyPage } from './components/WhereToBuyPage';
-import { SocialSection } from './components/SocialSection';
-import { FooterSection } from './components/FooterSection';
 import { OrderChannelModal } from './components/OrderChannelModal';
 import { QuickViewModal } from './components/QuickViewModal';
 import { AdminPanelModal } from './components/AdminPanelModal';
-import { MobileQuickBuyBar } from './components/MobileQuickBuyBar';
+import { ClaudeWowPreview } from './components/ClaudeWowPreview';
 
 const CONFIG_STORAGE_KEY = 'tomati_store_config_v4';
 const PRODUCTS_STORAGE_KEY = 'tomati_store_products_v4';
 
 export default function App() {
-  const [currentPage, setCurrentPage] = useState<PageView>('store');
-
   const [config, setConfig] = useState<StoreConfig>(() => {
     try {
       const saved = localStorage.getItem(CONFIG_STORAGE_KEY);
@@ -40,7 +31,16 @@ export default function App() {
     try {
       const saved = localStorage.getItem(PRODUCTS_STORAGE_KEY);
       if (saved) {
-        return JSON.parse(saved);
+        const parsed: Product[] = JSON.parse(saved);
+        return parsed.map((p) => {
+          const defaultProd = DEFAULT_PRODUCTS.find(
+            (dp) => dp.id === p.id || dp.brand.toLowerCase() === p.brand.toLowerCase()
+          );
+          return {
+            ...p,
+            imageUrl: p.imageUrl || defaultProd?.imageUrl,
+          };
+        });
       }
     } catch {
       // Fallback
@@ -53,12 +53,6 @@ export default function App() {
   const [adminModalOpen, setAdminModalOpen] = useState(false);
   const [customProductTitle, setCustomProductTitle] = useState<string | undefined>(undefined);
   const [portalOverride, setPortalOverride] = useState<string | undefined>(undefined);
-
-  // Scroll to top upon navigating between the 2 pages
-  const handleNavigate = (page: PageView) => {
-    setCurrentPage(page);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  };
 
   const handleSaveConfig = (newConfig: StoreConfig) => {
     setConfig(newConfig);
@@ -103,62 +97,15 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-[#FBF9F5] text-[#1E2420] flex flex-col font-sans selection:bg-[#D44A22]/20 selection:text-[#1F3E29]">
-      {/* 2-Page Top Navigation Bar with Pure Logotype */}
-      <Navbar
+      {/* LOJA OFICIAL TOMATI */}
+      <ClaudeWowPreview
         config={config}
-        currentPage={currentPage}
-        onNavigate={handleNavigate}
+        products={products}
         onOpenOrderModal={openGeneralOrderModal}
+        onOpenProductOrderModal={openProductOrderModal}
+        onSelectProduct={(product: Product) => setQuickViewProduct(product)}
         onOpenAdmin={() => setAdminModalOpen(true)}
       />
-
-      {/* Main Views (Maximum 2 Pages) */}
-      <main className="flex-1">
-        {currentPage === 'store' ? (
-          /* PÁGINA 1: LOJA & VITRINE PRINCIPAL */
-          <>
-            <HeroSection
-              config={config}
-              onOpenOrderModal={openGeneralOrderModal}
-              onExploreProducts={() => {
-                const vitrineEl = document.getElementById('vitrine');
-                vitrineEl?.scrollIntoView({ behavior: 'smooth' });
-              }}
-              onOpenAdmin={() => setAdminModalOpen(true)}
-            />
-
-            <ProductShowcase
-              products={products}
-              config={config}
-              onSelectProduct={(product) => setQuickViewProduct(product)}
-              onOpenOrderModal={openGeneralOrderModal}
-              onNavigateToWhereToBuy={() => handleNavigate('where-to-buy')}
-            />
-
-            <StorySection config={config} />
-
-            <SocialSection config={config} />
-          </>
-        ) : (
-          /* PÁGINA 2: ONDE COMPRAR (LOJA TOMATI & IFOOD) & REGIÕES DE ENTREGA */
-          <WhereToBuyPage
-            config={config}
-            onNavigateToStore={() => handleNavigate('store')}
-            onOpenOrderModal={openGeneralOrderModal}
-          />
-        )}
-      </main>
-
-      {/* Rodapé da Loja */}
-      <FooterSection
-        config={config}
-        onNavigate={handleNavigate}
-        onOpenOrderModal={openGeneralOrderModal}
-        onOpenConfigModal={() => setAdminModalOpen(true)}
-      />
-
-      {/* Barra de Compra Flutuante para Celular (Limite <15% viewport) */}
-      <MobileQuickBuyBar config={config} onOpenOrderModal={openGeneralOrderModal} />
 
       {/* Modal: Onde Comprar (Loja Tomati x iFood) */}
       <OrderChannelModal
@@ -180,7 +127,7 @@ export default function App() {
         }}
       />
 
-      {/* Painel Administrativo: Ofertas, Fotos, Links (Loja Tomati x iFood) & Marcas */}
+      {/* Painel Administrativo */}
       <AdminPanelModal
         isOpen={adminModalOpen}
         onClose={() => setAdminModalOpen(false)}

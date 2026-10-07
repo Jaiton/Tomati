@@ -15,7 +15,7 @@ export const BrandCarousel: React.FC<BrandCarouselProps> = ({ brands }) => {
     : [...brands, ...brands];
 
   return (
-    <div className="pt-2 max-w-7xl mx-auto space-y-2">
+    <div className="pt-2 max-w-7xl mx-auto space-y-2.5">
       <div className="flex items-center justify-between px-2">
         <div className="flex items-center gap-2">
           <span className="w-2 h-2 rounded-full bg-[#D44A22]" />
@@ -25,25 +25,25 @@ export const BrandCarousel: React.FC<BrandCarouselProps> = ({ brands }) => {
         </div>
       </div>
 
-      {/* Carrossel Infinito com APENAS AS LOGOS das marcas (sem nenhuma escrita adicional) */}
-      <div className="relative w-full overflow-hidden py-3 bg-white/80 backdrop-blur-xs rounded-2xl border border-stone-200 shadow-2xs group">
+      {/* Carrossel Infinito com APENAS AS LOGOS (sem retângulo/borda em volta, 40% maiores) */}
+      <div className="relative w-full overflow-hidden py-4 sm:py-5 bg-white/60 backdrop-blur-xs rounded-2xl border border-stone-200/80 shadow-2xs group">
         {/* Sombras suaves nas laterais para fade elegante */}
-        <div className="absolute left-0 top-0 bottom-0 w-12 sm:w-20 bg-gradient-to-r from-[#FBF9F5] sm:from-white via-[#FBF9F5]/70 to-transparent z-10 pointer-events-none" />
-        <div className="absolute right-0 top-0 bottom-0 w-12 sm:w-20 bg-gradient-to-l from-[#FBF9F5] sm:from-white via-[#FBF9F5]/70 to-transparent z-10 pointer-events-none" />
+        <div className="absolute left-0 top-0 bottom-0 w-14 sm:w-24 bg-gradient-to-r from-[#FBF9F5] sm:from-white/90 via-[#FBF9F5]/70 to-transparent z-10 pointer-events-none" />
+        <div className="absolute right-0 top-0 bottom-0 w-14 sm:w-24 bg-gradient-to-l from-[#FBF9F5] sm:from-white/90 via-[#FBF9F5]/70 to-transparent z-10 pointer-events-none" />
 
-        <div className="flex items-center gap-4 sm:gap-8 w-max animate-marquee hover:[animation-play-state:paused]">
+        <div className="flex items-center gap-8 sm:gap-14 w-max animate-marquee hover:[animation-play-state:paused]">
           {displayBrands.map((brand, idx) => (
             <div
               key={`${brand.id}-${idx}`}
-              className="flex items-center justify-center px-4 sm:px-6 py-2.5 rounded-xl bg-white border border-stone-200 shadow-2xs hover:shadow-xs hover:border-[#1F3E29] transition-all shrink-0 min-h-[52px] min-w-[110px]"
+              className="flex items-center justify-center shrink-0 transition-transform duration-300 hover:scale-105 select-none"
               title={brand.name || 'Marca Parceira'}
             >
-              {/* APENAS A LOGO DA MARCA */}
+              {/* APENAS A LOGO DA MARCA - SEM RETÂNGULO EM VOLTA E 40% MAIOR */}
               {brand.logoUrl ? (
                 <img
                   src={brand.logoUrl}
                   alt={brand.name || 'Logo Marca'}
-                  className="h-8 sm:h-9 w-auto max-w-[130px] max-h-[38px] object-contain"
+                  className="h-11 sm:h-14 w-auto max-w-[170px] max-h-[54px] object-contain drop-shadow-2xs"
                   onError={(e) => {
                     // Fallback visual caso a imagem não carregue
                     (e.target as HTMLElement).style.display = 'none';
@@ -51,7 +51,7 @@ export const BrandCarousel: React.FC<BrandCarouselProps> = ({ brands }) => {
                 />
               ) : (
                 <span
-                  className="font-bold text-sm tracking-tight font-display"
+                  className="font-bold text-lg sm:text-xl tracking-tight font-display px-2"
                   style={{ color: brand.accentColor || '#1F3E29' }}
                 >
                   {brand.name}
