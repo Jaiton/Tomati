@@ -125,11 +125,12 @@ export const TomatiLogo: React.FC<TomatiLogoProps> = ({
   if (withBadge) {
     const logoWidth = heightPx * 4.3;
     return (
-      <div className={`inline-flex items-center select-none ${className}`} style={{ height: heightPx }}>
+      <div className={`inline-flex items-center select-none shrink-0 ${className}`} style={{ height: heightPx, width: logoWidth, flexShrink: 0, minWidth: logoWidth }}>
         <svg
           viewBox="0 0 520 120"
-          style={{ height: heightPx, width: logoWidth }}
-          className="w-auto h-full overflow-visible"
+          preserveAspectRatio="xMidYMid meet"
+          style={{ height: heightPx, width: logoWidth, flexShrink: 0 }}
+          className="h-full overflow-visible"
           aria-label="Tomati Oficial"
         >
           <circle cx="60" cy="60" r="56" fill={circleBg} />
@@ -162,13 +163,17 @@ export const TomatiLogo: React.FC<TomatiLogoProps> = ({
   }
 
   // 3. Tipografia Pura Oficial (Default - tomati.)
-  const pureWidth = heightPx * 3.4;
+  const pureWidth = Math.round(heightPx * 3.46);
   return (
-    <div className={`inline-flex items-center select-none group ${className}`} style={{ height: heightPx }}>
+    <div
+      className={`inline-flex items-center select-none group shrink-0 ${className}`}
+      style={{ height: heightPx, width: pureWidth, flexShrink: 0, minWidth: pureWidth }}
+    >
       <svg
         viewBox="0 0 380 110"
-        style={{ height: heightPx, width: pureWidth }}
-        className="w-auto h-full overflow-visible transition-transform duration-200 group-hover:scale-[1.01]"
+        preserveAspectRatio="xMidYMid meet"
+        style={{ height: heightPx, width: pureWidth, flexShrink: 0, display: 'block' }}
+        className="h-full overflow-visible transition-transform duration-200 group-hover:scale-[1.01]"
         aria-label="Tomati Oficial"
       >
         <text

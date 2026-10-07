@@ -122,6 +122,53 @@ header .w {
   margin-right: auto;
   display: inline-flex;
   align-items: center;
+  flex-shrink: 0 !important;
+  min-width: max-content;
+}
+
+.logo img {
+  height: 36px;
+  width: auto;
+  max-width: none;
+  object-fit: contain;
+  flex-shrink: 0 !important;
+  display: block;
+}
+
+.logo span {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0 !important;
+}
+
+.logo svg {
+  flex-shrink: 0 !important;
+}
+
+@media(max-width: 640px) {
+  header .w {
+    gap: 8px;
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+  .soc {
+    gap: 4px;
+    flex-shrink: 0;
+  }
+  .soc a {
+    width: 36px;
+    height: 36px;
+  }
+  .soc svg {
+    width: 18px;
+    height: 18px;
+  }
+  header .btn {
+    min-height: 38px;
+    padding: 0 14px;
+    font-size: 13.5px;
+    flex-shrink: 0;
+  }
 }
 
 .logo i {
@@ -467,9 +514,19 @@ h2 {
   border: 0;
   color: inherit;
   font: inherit;
-  opacity: .6;
+  opacity: .45;
   cursor: pointer;
-  text-decoration: underline;
+  text-decoration: none !important;
+  transition: opacity .2s ease;
+  font-size: 13px;
+  padding: 4px 6px;
+  border-radius: 4px;
+}
+
+#ab:hover {
+  opacity: .9;
+  text-decoration: none !important;
+  background: rgba(255, 255, 255, 0.08);
 }
 
 #adm {

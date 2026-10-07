@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { TomatiLogo } from './TomatiLogo';
+import { AdminAuthModal } from './AdminAuthModal';
 
 // Configuração padrão idêntica ao código do Claude
 const D = {
@@ -241,9 +242,35 @@ export const ClaudeWowPreview: React.FC<any> = () => {
   const [isAdminOpen, setIsAdminOpen] = useState(false);
   const [adminMsg, setAdminMsg] = useState('');
   const [syncStatus, setSyncStatus] = useState<'online' | 'salvando' | 'erro' | 'carregando'>('carregando');
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [isAdminAuthenticated, setIsAdminAuthenticated] = useState<boolean>(() => {
+    try {
+      return Boolean(localStorage.getItem('tomati_admin_session_v1') || sessionStorage.getItem('tomati_admin_session_v1'));
+    } catch {
+      return false;
+    }
+  });
   const [confirmDeleteIdx, setConfirmDeleteIdx] = useState<number | null>(null);
   const [confirmReset, setConfirmReset] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleOpenAdmin = () => {
+    if (isAdminAuthenticated) {
+      setIsAdminOpen(true);
+    } else {
+      setIsAuthModalOpen(true);
+    }
+  };
+
+  const handleLogout = () => {
+    try {
+      localStorage.removeItem('tomati_admin_session_v1');
+      sessionStorage.removeItem('tomati_admin_session_v1');
+    } catch {}
+    setIsAdminAuthenticated(false);
+    setIsAdminOpen(false);
+    setAdminMsg('Sessão de administrador finalizada.');
+  };
 
   // Carregar dados salvos no servidor (para aparecer online para todos os visitantes)
   useEffect(() => {
@@ -335,7 +362,7 @@ export const ClaudeWowPreview: React.FC<any> = () => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'a' || e.key === 'A')) {
         e.preventDefault();
-        setIsAdminOpen(prev => !prev);
+        handleOpenAdmin();
       }
       if (e.key === 'Escape') {
         setIsAdminOpen(false);
@@ -343,7 +370,7 @@ export const ClaudeWowPreview: React.FC<any> = () => {
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
+  }, [isAdminAuthenticated]);
 
   // Handlers do Painel
   const handleUpdateField = (path: string, value: any) => {
@@ -518,15 +545,20 @@ export const ClaudeWowPreview: React.FC<any> = () => {
       {/* 1. HEADER (Verde Escuro Oficial Tomati) */}
       <header>
         <div className="w">
-          <a className="logo" href="#top" aria-label="Tomati">
+          <a
+            className="logo shrink-0"
+            href="#top"
+            aria-label="Tomati"
+            style={{ flexShrink: 0, minWidth: 'max-content' }}
+          >
             {data.img?.logo ? (
               <img
                 src={data.img.logo}
                 alt="Tomati"
-                style={{ height: '36px', width: 'auto', display: 'block' }}
+                style={{ height: '36px', width: 'auto', display: 'block', flexShrink: 0 }}
               />
             ) : (
-              <span className="flex items-center gap-2">
+              <span className="flex items-center gap-2 shrink-0" style={{ flexShrink: 0 }}>
                 <TomatiLogo size="sm" variant="light" />
               </span>
             )}
@@ -792,8 +824,8 @@ export const ClaudeWowPreview: React.FC<any> = () => {
             <button
               id="ab"
               type="button"
-              onClick={() => setIsAdminOpen(true)}
-              aria-label="Abrir painel da loja"
+              onClick={handleOpenAdmin}
+              aria-label="Acesso restrito ao painel da loja"
             >
               Painel da loja
             </button>
@@ -808,9 +840,28 @@ export const ClaudeWowPreview: React.FC<any> = () => {
         role="dialog"
         aria-label="Painel da loja"
       >
-        <div className="ah">
+        <div className="ah" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <b>Painel da loja</b>
-          <button type="button" onClick={() => setIsAdminOpen(false)}>Fechar</button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <button
+              type="button"
+              onClick={handleLogout}
+              style={{
+                fontSize: '12px',
+                padding: '4px 9px',
+                borderRadius: '8px',
+                background: 'rgba(230, 59, 31, 0.12)',
+                color: '#E63B1F',
+                border: '1px solid rgba(230, 59, 31, 0.25)',
+                fontWeight: 600,
+                cursor: 'pointer'
+              }}
+              title="Encerrar sessão de administrador"
+            >
+              Sair
+            </button>
+            <button type="button" onClick={() => setIsAdminOpen(false)}>Fechar</button>
+          </div>
         </div>
 
         <div className="ab">
@@ -1149,6 +1200,17 @@ export const ClaudeWowPreview: React.FC<any> = () => {
           {adminMsg && <div className="msg" role="status">{adminMsg}</div>}
         </div>
       </div>
+
+      {/* Modal de Acesso Restrito ao Administrador (Login e Cadastrar Discreto) */}
+      <AdminAuthModal
+        isOpen={isAuthModalOpen}
+        onClose={() => setIsAuthModalOpen(false)}
+        onLoginSuccess={() => {
+          setIsAdminAuthenticated(true);
+          setIsAuthModalOpen(false);
+          setIsAdminOpen(true);
+        }}
+      />
     </div>
   );
 };
