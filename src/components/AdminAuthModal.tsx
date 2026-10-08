@@ -200,11 +200,17 @@ export const AdminAuthModal: React.FC<AdminAuthModalProps> = ({
         <div className="py-3.5 px-4 sm:px-5 bg-[#14201A] border-b border-white/10 flex items-center justify-between shrink-0">
           <div className="flex items-center gap-3">
             <div className="logo shrink-0" style={{ flexShrink: 0, minWidth: 'max-content' }}>
-              <img
-                src={logoUrl || '/logo_tomati_light.svg'}
-                alt="Tomati Oficial"
-                style={{ height: '32px', width: 'auto', display: 'block', flexShrink: 0 }}
-              />
+              {logoUrl ? (
+                <img
+                  src={logoUrl}
+                  alt="Tomati Oficial"
+                  style={{ height: '32px', width: 'auto', display: 'block', flexShrink: 0 }}
+                />
+              ) : (
+                <span className="text-white font-extrabold tracking-tight text-xl font-serif inline-flex items-center">
+                  tomati<span className="text-[#FFC93C]">.</span>
+                </span>
+              )}
             </div>
             <span className="text-[10px] font-mono uppercase tracking-wider text-white/60 border-l border-white/20 pl-2.5">
               Painel Seguro

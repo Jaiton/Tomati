@@ -46,6 +46,11 @@ const DEFAULT_STORE_DATA = {
     logo: '',
     favicon: '',
   },
+  menu: [
+    { id: '1', title: 'Na Vitrini', url: '#produtos' },
+    { id: '2', title: 'Sobre', url: '#sobre' },
+    { id: '3', title: 'Onde comprar', url: '#onde' },
+  ],
   regiao: 'Curitiba e Região',
   horario: 'Segunda a Sábado: 08h às 21h · Domingo: 09h às 18h',
   contato: '(41) 99999-8888 · contato@tomatibrasil.com.br',

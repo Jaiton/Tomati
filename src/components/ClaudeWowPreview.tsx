@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { TomatiLogo } from './TomatiLogo';
 import { AdminAuthModal } from './AdminAuthModal';
+import { PWAInstallModal } from './PWAInstallModal';
+import { Menu, X, Smartphone, Download, MapPin, Clock, Phone, ShoppingBag, ArrowRight } from 'lucide-react';
 
 // Configuração padrão idêntica ao código do Claude
 const D = {
@@ -15,9 +17,14 @@ const D = {
     tiktok: '@tomatibrasil',
   },
   img: {
-    logo: '/logo_tomati_light.svg',
+    logo: '',
     favicon: '',
   },
+  menu: [
+    { id: '1', title: 'Na Vitrini', url: '#produtos' },
+    { id: '2', title: 'Sobre', url: '#sobre' },
+    { id: '3', title: 'Onde comprar', url: '#onde' },
+  ],
   regiao: 'Curitiba e Região',
   horario: 'Segunda a Sábado: 08h às 21h · Domingo: 09h às 18h',
   contato: '(41) 99999-8888 · contato@tomatibrasil.com.br',
@@ -274,6 +281,8 @@ export const ClaudeWowPreview: React.FC<any> = () => {
   });
   const [confirmDeleteIdx, setConfirmDeleteIdx] = useState<number | null>(null);
   const [confirmReset, setConfirmReset] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isPWAInstallModalOpen, setIsPWAInstallModalOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleOpenAdmin = () => {
@@ -490,6 +499,61 @@ export const ClaudeWowPreview: React.FC<any> = () => {
     }
   };
 
+  const handleUpdateMenuItem = (index: number, field: 'title' | 'url', value: string) => {
+    const next = clone(data);
+    if (!next.menu) {
+      next.menu = [
+        { id: '1', title: 'Na Vitrini', url: '#produtos' },
+        { id: '2', title: 'Sobre', url: '#sobre' },
+        { id: '3', title: 'Onde comprar', url: '#onde' },
+      ];
+    }
+    if (next.menu[index]) {
+      next.menu[index][field] = value;
+      persistData(next);
+    }
+  };
+
+  const handleAddMenuItem = () => {
+    const next = clone(data);
+    if (!next.menu) {
+      next.menu = [
+        { id: '1', title: 'Na Vitrini', url: '#produtos' },
+        { id: '2', title: 'Sobre', url: '#sobre' },
+        { id: '3', title: 'Onde comprar', url: '#onde' },
+      ];
+    }
+    const newId = String(Date.now());
+    next.menu.push({ id: newId, title: 'Novo Item', url: '#produtos' });
+    persistData(next);
+    setAdminMsg('Novo item adicionado ao menu!');
+  };
+
+  const handleRemoveMenuItem = (index: number) => {
+    const next = clone(data);
+    if (next.menu && next.menu[index]) {
+      next.menu.splice(index, 1);
+      persistData(next);
+      setAdminMsg('Item de menu removido.');
+    }
+  };
+
+  const handleUpdateLogoUrl = (url: string) => {
+    const next = clone(data);
+    if (!next.img) next.img = { logo: '', favicon: '' };
+    next.img.logo = url;
+    persistData(next);
+    setAdminMsg('Logo salva com sucesso!');
+  };
+
+  const handleRemoveLogo = () => {
+    const next = clone(data);
+    if (!next.img) next.img = { logo: '', favicon: '' };
+    next.img.logo = '';
+    persistData(next);
+    setAdminMsg('Logo removida. A base de dados não exibirá mais a logo antiga.');
+  };
+
   const handleCopyConfig = () => {
     navigator.clipboard.writeText(JSON.stringify(data, null, 2)).then(
       () => setAdminMsg('Configuração copiada para a área de transferência.'),
@@ -566,7 +630,7 @@ export const ClaudeWowPreview: React.FC<any> = () => {
         </symbol>
       </svg>
 
-      {/* 1. HEADER (Verde Escuro Oficial Tomati) */}
+      {/* 1. HEADER (Verde Escuro Oficial Tomati com Suporte a iOS & Mobile Completo) */}
       <header>
         <div className="w">
           <a
@@ -575,19 +639,36 @@ export const ClaudeWowPreview: React.FC<any> = () => {
             aria-label="Tomati"
             style={{ flexShrink: 0, minWidth: 'max-content' }}
           >
-            <img
-              src={data.img?.logo || '/logo_tomati_light.svg'}
-              alt="Tomati Oficial"
-              style={{ height: '34px', width: 'auto', display: 'block', flexShrink: 0 }}
-            />
+            {data.img?.logo ? (
+              <img
+                src={data.img.logo}
+                alt="Tomati"
+                style={{ height: '34px', width: 'auto', display: 'block', flexShrink: 0 }}
+              />
+            ) : (
+              <span className="text-white font-extrabold tracking-tight text-2xl font-serif inline-flex items-center">
+                tomati<span className="text-[#FFC93C]">.</span>
+              </span>
+            )}
           </a>
 
+          {/* Navegação Desktop */}
           <nav className="nav-main">
-            <a href="#produtos">Produtos</a>
-            <a href="#sobre">Sobre</a>
-            <a href="#onde">Onde comprar</a>
+            {(data.menu && data.menu.length > 0
+              ? data.menu
+              : [
+                  { id: '1', title: 'Na Vitrini', url: '#produtos' },
+                  { id: '2', title: 'Sobre', url: '#sobre' },
+                  { id: '3', title: 'Onde comprar', url: '#onde' },
+                ]
+            ).map((mItem: any) => (
+              <a key={mItem.id || mItem.url} href={mItem.url}>
+                {mItem.title}
+              </a>
+            ))}
           </nav>
 
+          {/* Redes Sociais Desktop */}
           <div className="soc">
             <a href={getUrl('instagram')} aria-label="Instagram" target="_blank" rel="noopener noreferrer">
               <svg viewBox="0 0 24 24"><use href="#ig" /></svg>
@@ -597,8 +678,150 @@ export const ClaudeWowPreview: React.FC<any> = () => {
             </a>
           </div>
 
-          <a className="btn b-white" href="#onde">Fazer pedido</a>
+          <div className="flex items-center gap-2">
+            {/* Botão de Pedido */}
+            <a className="btn b-white shrink-0" href="#onde">Fazer pedido</a>
+
+            {/* Botão Menu Hambúrguer (Mobile / iOS) */}
+            <button
+              type="button"
+              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+              className="inline-flex md:hidden items-center justify-center w-9 h-9 rounded-xl bg-white/10 hover:bg-white/20 text-white transition-all cursor-pointer border border-white/15 shrink-0"
+              aria-label={isMobileMenuOpen ? "Fechar menu" : "Abrir menu"}
+              title="Menu de informações e navegação"
+            >
+              {isMobileMenuOpen ? <X size={19} /> : <Menu size={19} />}
+            </button>
+          </div>
         </div>
+
+        {/* Sub-barra de Navegação Rápida no Mobile (Garante visibilidade total no iOS e Android sem encavalar) */}
+        <nav className="nav-sub-mobile" aria-label="Navegação rápida">
+          {(data.menu && data.menu.length > 0
+            ? data.menu
+            : [
+                { id: '1', title: 'Na Vitrini', url: '#produtos' },
+                { id: '2', title: 'Sobre', url: '#sobre' },
+                { id: '3', title: 'Onde comprar', url: '#onde' },
+              ]
+          ).map((mItem: any, idx: number, arr: any[]) => (
+            <React.Fragment key={mItem.id || mItem.url || idx}>
+              <a href={mItem.url}>{mItem.title}</a>
+              {idx < arr.length - 1 && <span className="dot-sep">·</span>}
+            </React.Fragment>
+          ))}
+        </nav>
+
+        {/* Menu Mobile / Drawer Desdobrável no Padrão Oficial (iOS & Android) */}
+        {isMobileMenuOpen && (
+          <div className="md:hidden bg-[#14201A] border-t border-white/15 px-4 py-4 animate-in slide-in-from-top-2 duration-200 text-white space-y-4 shadow-2xl">
+            {/* Links Rápidos com ícones */}
+            <div className={`grid gap-2 ${(data.menu || []).length > 3 ? 'grid-cols-2' : 'grid-cols-3'}`}>
+              {(data.menu && data.menu.length > 0
+                ? data.menu
+                : [
+                    { id: '1', title: 'Na Vitrini', url: '#produtos' },
+                    { id: '2', title: 'Sobre', url: '#sobre' },
+                    { id: '3', title: 'Onde comprar', url: '#onde' },
+                  ]
+              ).map((mItem: any, idx: number) => {
+                const icons = [
+                  <ShoppingBag size={18} className="text-[#FFC93C] mb-1" />,
+                  <span className="text-base mb-0.5">🌿</span>,
+                  <span className="text-base mb-0.5">🛵</span>,
+                ];
+                return (
+                  <a
+                    key={mItem.id || idx}
+                    href={mItem.url}
+                    onClick={() => setIsMobileMenuOpen(false)}
+                    className="flex flex-col items-center justify-center p-2.5 rounded-2xl bg-white/5 hover:bg-white/10 border border-white/10 text-center transition-colors"
+                  >
+                    {icons[idx % icons.length]}
+                    <span className="text-xs font-bold">{mItem.title}</span>
+                  </a>
+                );
+              })}
+            </div>
+
+            {/* Ações de Pedido Direto */}
+            <div className="flex gap-2">
+              <a
+                href={getUrl('portal')}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={() => setIsMobileMenuOpen(false)}
+                className="flex-1 py-2.5 px-3 rounded-xl bg-[#E63B1F] hover:bg-[#d43319] text-white font-bold text-xs text-center shadow-md flex items-center justify-center gap-1.5"
+              >
+                <span>Portal Tomati</span>
+                <ArrowRight size={13} />
+              </a>
+
+              <a
+                href={getUrl('ifood')}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={() => setIsMobileMenuOpen(false)}
+                className="flex-1 py-2.5 px-3 rounded-xl bg-[#EA1D2C] hover:bg-[#c91825] text-white font-bold text-xs text-center shadow-md flex items-center justify-center gap-1.5"
+              >
+                <span>Pedir no iFood</span>
+                <ArrowRight size={13} />
+              </a>
+            </div>
+
+            {/* Informações da Loja (Resolve a queixa do iOS onde faltavam informações) */}
+            <div className="p-3.5 rounded-2xl bg-white/5 border border-white/10 space-y-2 text-xs">
+              <div className="flex items-start gap-2.5 text-white/90">
+                <MapPin size={15} className="text-[#FFC93C] shrink-0 mt-0.5" />
+                <span><strong>Região:</strong> {data.regiao}</span>
+              </div>
+              <div className="flex items-start gap-2.5 text-white/80">
+                <Clock size={15} className="text-[#FFC93C] shrink-0 mt-0.5" />
+                <span className="text-[11px] leading-tight">{data.horario}</span>
+              </div>
+              <div className="flex items-start gap-2.5 text-white/80">
+                <Phone size={15} className="text-[#FFC93C] shrink-0 mt-0.5" />
+                <span className="text-[11px] leading-tight">{data.contato}</span>
+              </div>
+            </div>
+
+            {/* Redes Sociais & Instalar App */}
+            <div className="flex items-center justify-between pt-1">
+              <div className="flex items-center gap-3">
+                <a
+                  href={getUrl('instagram')}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-1.5 text-xs text-white/80 hover:text-white"
+                >
+                  <svg viewBox="0 0 24 24" className="w-4 h-4 fill-white"><use href="#ig" /></svg>
+                  <span className="text-[11px] font-mono">{data.handles.instagram}</span>
+                </a>
+                <a
+                  href={getUrl('tiktok')}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-1.5 text-xs text-white/80 hover:text-white"
+                >
+                  <svg viewBox="0 0 24 24" className="w-4 h-4 fill-white"><use href="#tt" /></svg>
+                  <span className="text-[11px] font-mono">{data.handles.tiktok}</span>
+                </a>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setIsMobileMenuOpen(false);
+                  setIsPWAInstallModalOpen(true);
+                }}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#FFC93C] text-[#14201A] font-bold text-xs shadow-xs cursor-pointer active:scale-95"
+              >
+                <Download size={13} />
+                <span>Instalar App</span>
+              </button>
+            </div>
+          </div>
+        )}
       </header>
 
       <main id="top">
@@ -803,11 +1026,17 @@ export const ClaudeWowPreview: React.FC<any> = () => {
         <div className="w">
           <div>
             <div className="logo" style={{ color: '#fff' }}>
-              <img
-                src={data.img?.logo || '/logo_tomati_light.svg'}
-                alt="Tomati Oficial"
-                style={{ height: '36px', width: 'auto', display: 'block', flexShrink: 0 }}
-              />
+              {data.img?.logo ? (
+                <img
+                  src={data.img.logo}
+                  alt="Tomati"
+                  style={{ height: '36px', width: 'auto', display: 'block', flexShrink: 0 }}
+                />
+              ) : (
+                <span className="text-white font-extrabold tracking-tight text-2xl font-serif inline-flex items-center">
+                  tomati<span className="text-[#FFC93C]">.</span>
+                </span>
+              )}
             </div>
             <p style={{ marginTop: '8px' }}>mais perto, mais fácil.</p>
           </div>
@@ -835,17 +1064,37 @@ export const ClaudeWowPreview: React.FC<any> = () => {
             </div>
           </div>
 
-          <div style={{ gridColumn: '1 / -1', opacity: 0.7, display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
+          <div style={{ gridColumn: '1 / -1', opacity: 0.8, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
             <span>© 2026 Tomati Brasil. Todos os direitos reservados.</span>
-            <button
-              id="ab"
-              type="button"
-              onClick={handleOpenAdmin}
-              aria-label="Acesso restrito ao painel da loja"
-              style={{ textDecoration: 'none', border: 'none', outline: 'none', background: 'transparent' }}
-            >
-              Painel da loja
-            </button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+              <button
+                type="button"
+                onClick={() => setIsPWAInstallModalOpen(true)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: 'rgba(255, 255, 255, 0.85)',
+                  cursor: 'pointer',
+                  fontSize: '13px',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: 0,
+                }}
+              >
+                <Smartphone size={14} className="text-[#FFC93C]" />
+                <span>Instalar App</span>
+              </button>
+              <button
+                id="ab"
+                type="button"
+                onClick={handleOpenAdmin}
+                aria-label="Acesso restrito ao painel da loja"
+                style={{ textDecoration: 'none', border: 'none', outline: 'none', background: 'transparent' }}
+              >
+                Painel da loja
+              </button>
+            </div>
           </div>
         </div>
       </footer>
@@ -1067,44 +1316,240 @@ export const ClaudeWowPreview: React.FC<any> = () => {
             />
           </label>
 
-          {/* Logo e ícones */}
-          <h4>Logo e ícones</h4>
+          {/* Gerenciamento do Menu de Navegação */}
+          <h4>Menu e Navegação do Cabeçalho</h4>
           <p>
-            Use PNG com fundo transparente. O logo aparece no cabeçalho e no rodapé (fundo verde-escuro), então prefira a versão clara. (Os ícones do Instagram e TikTok são brancos nativos).
+            Altere os títulos e links dos menus exibidos no cabeçalho e na versão mobile do site. Você pode escrever o título que desejar para cada item.
           </p>
-          {[
-            ['logo', 'Logo da loja'],
-            ['favicon', 'Ícone do site (aba do navegador)'],
-          ].map(([key, label]) => {
-            const currentImg = data.img ? (data.img as any)[key] : '';
-            return (
-              <div key={key} style={{ marginTop: '8px' }}>
-                <label>
-                  {label}
+
+          <div style={{ marginBottom: '16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            {(data.menu && data.menu.length > 0
+              ? data.menu
+              : [
+                  { id: '1', title: 'Na Vitrini', url: '#produtos' },
+                  { id: '2', title: 'Sobre', url: '#sobre' },
+                  { id: '3', title: 'Onde comprar', url: '#onde' },
+                ]
+            ).map((mItem: any, mIdx: number) => (
+              <div
+                key={mItem.id || mIdx}
+                style={{
+                  background: 'rgba(255, 255, 255, 0.05)',
+                  border: '1px solid rgba(255, 255, 255, 0.12)',
+                  borderRadius: '12px',
+                  padding: '12px 14px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '8px',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <span style={{ fontSize: '12px', fontWeight: 700, color: '#FFC93C' }}>
+                    Item #{mIdx + 1}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveMenuItem(mIdx)}
+                    style={{
+                      background: 'rgba(230, 59, 31, 0.15)',
+                      border: '1px solid rgba(230, 59, 31, 0.3)',
+                      color: '#ff7875',
+                      borderRadius: '6px',
+                      padding: '2px 8px',
+                      fontSize: '11px',
+                      cursor: 'pointer',
+                      fontWeight: 600,
+                    }}
+                  >
+                    Excluir Item
+                  </button>
+                </div>
+
+                <label style={{ margin: 0 }}>
+                  Título do Menu (como aparece no cabeçalho)
                   <input
-                    type="file"
-                    accept="image/*"
-                    onChange={(e) => handleFileUpload(e, key)}
+                    type="text"
+                    placeholder="Ex: Na Vitrini, Nossos Produtos, Ofertas..."
+                    value={mItem.title}
+                    onChange={(e) => handleUpdateMenuItem(mIdx, 'title', e.target.value)}
+                    style={{ marginTop: '4px' }}
                   />
                 </label>
-                {currentImg && (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px' }}>
-                    <img
-                      src={currentImg}
-                      alt=""
-                      style={{ height: '36px', background: '#0F3B2A', padding: '4px', borderRadius: '6px' }}
-                    />
-                    <button
-                      type="button"
-                      onClick={() => handleUpdateField(`img.${key}`, '')}
-                    >
-                      Remover
-                    </button>
-                  </div>
-                )}
+
+                <label style={{ margin: 0 }}>
+                  Link / Âncora de Destino
+                  <input
+                    type="text"
+                    placeholder="Ex: #produtos, #sobre, #onde ou link externo"
+                    value={mItem.url}
+                    onChange={(e) => handleUpdateMenuItem(mIdx, 'url', e.target.value)}
+                    style={{ marginTop: '4px' }}
+                  />
+                </label>
               </div>
-            );
-          })}
+            ))}
+
+            <button
+              type="button"
+              onClick={handleAddMenuItem}
+              style={{
+                width: '100%',
+                padding: '10px 14px',
+                borderRadius: '10px',
+                background: 'rgba(255, 255, 255, 0.08)',
+                border: '1px dashed rgba(255, 255, 255, 0.3)',
+                color: '#fff',
+                fontSize: '13px',
+                fontWeight: 600,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '6px',
+              }}
+            >
+              + Adicionar Novo Item ao Menu
+            </button>
+          </div>
+
+          {/* Gerenciamento do Logotipo Oficial */}
+          <h4>Logotipo da Loja</h4>
+          <p>
+            Altere ou envie sua nova logo oficial. A nova imagem substitui permanentemente qualquer logo anterior em todo o site (cabeçalho, rodapé e modais) e é salva na base de dados.
+          </p>
+
+          <div
+            style={{
+              background: 'rgba(255, 255, 255, 0.05)',
+              border: '1px solid rgba(255, 255, 255, 0.12)',
+              borderRadius: '12px',
+              padding: '14px',
+              marginBottom: '16px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '12px',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <span style={{ fontSize: '12px', fontWeight: 700, color: '#FFC93C' }}>
+                Logo Ativa na Base de Dados
+              </span>
+              {data.img?.logo && (
+                <button
+                  type="button"
+                  onClick={handleRemoveLogo}
+                  style={{
+                    background: 'rgba(230, 59, 31, 0.15)',
+                    border: '1px solid rgba(230, 59, 31, 0.3)',
+                    color: '#ff7875',
+                    borderRadius: '6px',
+                    padding: '3px 9px',
+                    fontSize: '11px',
+                    cursor: 'pointer',
+                    fontWeight: 600,
+                  }}
+                  title="Remove a logo atual da base de dados e não volta com logos antigas"
+                >
+                  Remover Logo Atual
+                </button>
+              )}
+            </div>
+
+            {/* Preview da Logo no fundo do cabeçalho */}
+            <div
+              style={{
+                background: '#14201A',
+                border: '1px solid rgba(255, 255, 255, 0.15)',
+                borderRadius: '10px',
+                padding: '14px',
+                minHeight: '64px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              {data.img?.logo ? (
+                <img
+                  src={data.img.logo}
+                  alt="Logo Ativa"
+                  style={{ maxHeight: '42px', maxWidth: '100%', objectFit: 'contain' }}
+                />
+              ) : (
+                <span style={{ fontSize: '13px', opacity: 0.65, fontStyle: 'italic' }}>
+                  Nenhuma imagem definida — exibindo texto: <strong>tomati.</strong>
+                </span>
+              )}
+            </div>
+
+            {/* Opção 1: Upload pelo computador / celular */}
+            <label style={{ margin: 0 }}>
+              Opção 1: Enviar arquivo de imagem (PNG transparente, SVG ou JPG)
+              <input
+                type="file"
+                accept="image/*"
+                onChange={(e) => handleFileUpload(e, 'logo')}
+                style={{ marginTop: '6px' }}
+              />
+            </label>
+
+            {/* Opção 2: URL direta da logo */}
+            <label style={{ margin: 0 }}>
+              Opção 2: Ou cole o link direto da imagem (URL)
+              <div style={{ display: 'flex', gap: '6px', marginTop: '6px' }}>
+                <input
+                  type="text"
+                  placeholder="https://... ou /uploads/..."
+                  value={data.img?.logo || ''}
+                  onChange={(e) => handleUpdateLogoUrl(e.target.value)}
+                  style={{ flex: 1 }}
+                />
+                <button
+                  type="button"
+                  onClick={() => persistData(data)}
+                  style={{
+                    padding: '6px 12px',
+                    background: '#FFC93C',
+                    color: '#14201A',
+                    fontWeight: 700,
+                    borderRadius: '8px',
+                    border: 'none',
+                    fontSize: '12px',
+                    cursor: 'pointer',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  Salvar
+                </button>
+              </div>
+            </label>
+          </div>
+
+          {/* Favicon */}
+          <div style={{ marginBottom: '16px' }}>
+            <label>
+              Ícone do site / Favicon (aba do navegador)
+              <input
+                type="file"
+                accept="image/*"
+                onChange={(e) => handleFileUpload(e, 'favicon')}
+              />
+            </label>
+            {data.img?.favicon && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px' }}>
+                <img
+                  src={data.img.favicon}
+                  alt=""
+                  style={{ height: '32px', background: '#0F3B2A', padding: '4px', borderRadius: '6px' }}
+                />
+                <button
+                  type="button"
+                  onClick={() => handleUpdateField('img.favicon', '')}
+                >
+                  Remover Favicon
+                </button>
+              </div>
+            )}
+          </div>
 
           {/* Vitrine (do primeiro ao último) */}
           <h4>Vitrine (do primeiro ao último)</h4>
@@ -1264,7 +1709,13 @@ export const ClaudeWowPreview: React.FC<any> = () => {
           setIsAuthModalOpen(false);
           setIsAdminOpen(true);
         }}
-        logoUrl={data.img?.logo || '/logo_tomati_light.svg'}
+        logoUrl={data.img?.logo || ''}
+      />
+
+      {/* Modal de Instalação do PWA (Suporte Especial a iOS Safari e Android/Chrome) */}
+      <PWAInstallModal
+        isOpen={isPWAInstallModalOpen}
+        onClose={() => setIsPWAInstallModalOpen(false)}
       />
     </div>
   );

@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
+  <!-- Full bleed background for Android maskable icon safe zone -->
+  <rect width="512" height="512" fill="#14201A" />
+  
+  <!-- Safe zone inner circle badge (within 80% circle) -->
+  <circle cx="256" cy="256" r="148" fill="#1F3E29" />
+  <circle cx="256" cy="256" r="126" fill="#FFFFFF" />
+  
+  <!-- "t" text -->
+  <text x="238" y="310" font-family="'Plus Jakarta Sans', system-ui, -apple-system, sans-serif" font-weight="900" font-size="190" fill="#14201A" text-anchor="middle">t</text>
+  
+  <!-- Red period "." -->
+  <circle cx="314" cy="300" r="20" fill="#E63B1F" />
+</svg>

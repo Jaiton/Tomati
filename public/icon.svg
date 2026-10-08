@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
+  <!-- Rounded forest green background -->
+  <rect width="512" height="512" rx="128" fill="#14201A" />
+  
+  <!-- Inner accent ring -->
+  <circle cx="256" cy="256" r="172" fill="#1F3E29" stroke="rgba(255,201,60,0.3)" stroke-width="6" />
+  
+  <!-- Badge: White circle with styled t. -->
+  <circle cx="256" cy="256" r="140" fill="#FFFFFF" />
+  
+  <!-- "t" text -->
+  <text x="236" y="316" font-family="'Plus Jakarta Sans', system-ui, -apple-system, sans-serif" font-weight="900" font-size="210" fill="#14201A" text-anchor="middle">t</text>
+  
+  <!-- Red period "." -->
+  <circle cx="320" cy="305" r="22" fill="#E63B1F" />
+</svg>

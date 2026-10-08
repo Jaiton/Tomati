@@ -105,28 +105,43 @@ export const TomatiLogo: React.FC<TomatiLogoProps> = ({
 
   // Se houver logo personalizada carregada no Admin
   const customLogoUrl = isLight ? customDarkBgUrl : customLightBgUrl;
-  const officialLogoSrc = isLight ? '/logo_tomati_light.svg' : '/logo_tomati.svg';
 
   // 1. Apenas Ícone Oficial
   if (showIconOnly) {
     return <TomatiIcon size={heightPx} variant={variant} className={className} />;
   }
 
-  // 2. Renderização da Logo Oficial Tomati
+  // 2. Renderização da Logo
+  if (customLogoUrl) {
+    return (
+      <img
+        src={customLogoUrl}
+        alt="Tomati Oficial"
+        className={`inline-block object-contain select-none shrink-0 ${className}`}
+        style={{
+          height: heightPx,
+          width: 'auto',
+          display: 'block',
+          flexShrink: 0,
+          maxWidth: 'none',
+        }}
+        loading="eager"
+        decoding="async"
+      />
+    );
+  }
+
+  // Sem logo na base de dados: exibe a marca em tipografia elegante e limpa
   return (
-    <img
-      src={customLogoUrl || officialLogoSrc}
-      alt="Tomati Oficial"
-      className={`inline-block object-contain select-none shrink-0 ${className}`}
+    <span
+      className={`inline-flex items-center font-serif font-black tracking-tight select-none shrink-0 ${className}`}
       style={{
-        height: heightPx,
-        width: 'auto',
-        display: 'block',
-        flexShrink: 0,
-        maxWidth: 'none',
+        fontSize: `${heightPx * 0.76}px`,
+        color: isLight ? '#FFFFFF' : '#1F3E29',
+        lineHeight: 1,
       }}
-      loading="eager"
-      decoding="async"
-    />
+    >
+      tomati<span style={{ color: '#FFC93C' }}>.</span>
+    </span>
   );
 };
