@@ -3,6 +3,34 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, viewport-fit=cover" />
+    <script>
+      // In the AI Studio iframe/preview environment, Vite HMR WebSockets are not forwarded across the proxy.
+      // Shim the internal 'vite-hmr' and 'vite-ping' WebSocket instances to prevent false-positive connection errors.
+      (function() {
+        var NativeWebSocket = window.WebSocket;
+        if (!NativeWebSocket) return;
+        function MockHmrSocket() {
+          var target = new EventTarget();
+          target.readyState = 1;
+          target.OPEN = 1;
+          target.CLOSED = 3;
+          target.send = function() {};
+          target.close = function() {};
+          return target;
+        }
+        window.WebSocket = function(url, protocols) {
+          if (protocols === 'vite-hmr' || protocols === 'vite-ping') {
+            return MockHmrSocket();
+          }
+          return new NativeWebSocket(url, protocols);
+        };
+        window.WebSocket.prototype = NativeWebSocket.prototype;
+        window.WebSocket.CONNECTING = 0;
+        window.WebSocket.OPEN = 1;
+        window.WebSocket.CLOSING = 2;
+        window.WebSocket.CLOSED = 3;
+      })();
+    </script>
     <title>Tomati. | Sua loja de saudabilidade | mais perto, mais fácil.</title>
     <meta name="description" content="Sua loja de saudabilidade com o equilíbrio perfeito entre suplementação, nutrição e sabor. Hey! Mu, Naveia, Tocca, Yok-k!, Fruit-Titus. Peça no portal ou no iFood." />
     <meta property="og:title" content="Tomati. | Sua loja de saudabilidade | mais perto, mais fácil." />
