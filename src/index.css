@@ -491,10 +491,14 @@ h2 {
 }
 
 .camp.has-banner {
-  border: 1px solid rgba(255, 255, 255, 0.22);
+  border: 2px solid var(--butter);
   background-size: cover !important;
   background-position: center !important;
   background-repeat: no-repeat !important;
+}
+
+.blk.has-banner {
+  border: 2px solid var(--butter);
 }
 
 .camp.has-banner::before,

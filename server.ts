@@ -219,6 +219,7 @@ const DEFAULT_STORE_DATA = {
       nivel: 4,
       bg: '#14201A',
       c: '#FFC93C',
+      borderColor: '#FFC93C',
       img: '',
       r: 0,
     },

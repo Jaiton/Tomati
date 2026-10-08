@@ -114,6 +114,7 @@ const D = {
       nivel: 4,
       bg: '#14201A',
       c: '#FFC93C',
+      borderColor: '#FFC93C',
       img: '',
       r: 0,
     },
@@ -1055,6 +1056,7 @@ export const ClaudeWowPreview: React.FC<any> = () => {
                 const isCamp = Boolean(p.camp);
                 const hasBannerImg = Boolean(p.img && !failedImages[p.img]);
                 const isBannerStyle = (isCamp && hasBannerImg) || (p.nivel === 4 && hasBannerImg);
+                const bannerBorderColor = p.borderColor || '#FFC93C';
 
                 const blockStyle: React.CSSProperties = isBannerStyle
                   ? ({
@@ -1063,12 +1065,17 @@ export const ClaudeWowPreview: React.FC<any> = () => {
                       backgroundPosition: 'center',
                       backgroundRepeat: 'no-repeat',
                       color: p.c || '#ffffff',
-                      border: '1px solid rgba(255, 255, 255, 0.22)',
+                      border: `2px solid ${bannerBorderColor}`,
                       '--c': p.c || '#ffffff',
                       '--bg2': p.bg || '#14201A',
                     } as any)
                   : isCamp
-                  ? ({ '--c': p.c || '#FFC93C', '--bg2': p.bg || '#14201A', background: p.bg || '#14201A' } as any)
+                  ? ({
+                      '--c': p.c || '#FFC93C',
+                      '--bg2': p.bg || '#14201A',
+                      background: p.bg || '#14201A',
+                      border: `2px dashed ${bannerBorderColor}`,
+                    } as any)
                   : ({ background: p.bg, '--c': p.c, '--bg2': p.bg } as any);
 
                 return (
@@ -1908,6 +1915,31 @@ export const ClaudeWowPreview: React.FC<any> = () => {
                         onChange={(e) => handleUpdateProduct(i, 'c', e.target.value)}
                       />
                     </label>
+                    <label>
+                      Cor da borda
+                      <input
+                        type="color"
+                        value={p.borderColor || '#FFC93C'}
+                        onChange={(e) => handleUpdateProduct(i, 'borderColor', e.target.value)}
+                      />
+                    </label>
+                  </div>
+                  <div style={{ display: 'flex', gap: '6px', marginTop: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
+                    <span style={{ fontSize: '11px', opacity: 0.8 }}>Borda padrão:</span>
+                    <button
+                      type="button"
+                      onClick={() => handleUpdateProduct(i, 'borderColor', '#FFC93C')}
+                      style={{ fontSize: '11px', padding: '2px 8px', borderRadius: '4px', background: '#FFC93C', color: '#14201A', fontWeight: 700, border: 'none', cursor: 'pointer' }}
+                    >
+                      Laranja Padrão (#FFC93C)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleUpdateProduct(i, 'borderColor', '#E63B1F')}
+                      style={{ fontSize: '11px', padding: '2px 8px', borderRadius: '4px', background: '#E63B1F', color: '#ffffff', fontWeight: 700, border: 'none', cursor: 'pointer' }}
+                    >
+                      Laranja Tomati (#E63B1F)
+                    </button>
                   </div>
                 </div>
               ) : (

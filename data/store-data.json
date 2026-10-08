@@ -11,7 +11,8 @@
   },
   "img": {
     "logo": "/uploads/brand-logo-1791487284490-4c8cc840fb27055f.png",
-    "favicon": "/uploads/brand-favicon-1791487298420-3e2e18722687098a.png"
+    "favicon": "/uploads/brand-favicon-1791487298420-3e2e18722687098a.png",
+    "hero_banner": ""
   },
   "menu": [
     {
@@ -142,7 +143,8 @@
       "nivel": 4,
       "bg": "#14201A",
       "c": "#FFC93C",
-      "img": "",
+      "borderColor": "#FFC93C",
+      "img": "/uploads/prod-5-1791490811727-a8f97bba15148e5b.webp",
       "r": 0
     }
   ]
