@@ -603,9 +603,44 @@ app.post('/api/admin/change-password', requireAuth, (req, res) => {
   }
 });
 
-// Endpoint PROTEGIDO: Criar Novo Administrador (apenas administrador autenticado pode criar outro!)
-app.post('/api/admin/register', requireAuth, (req, res) => {
+// Endpoint Público: Verificar se o cadastro inicial do proprietário está disponível
+app.get('/api/admin/setup-status', (_req, res) => {
   try {
+    const admins = getAdminUsers();
+    const hasCustomAdmin = admins.some((a) => a.username.toLowerCase() !== 'admin');
+    return res.json({ canRegister: !hasCustomAdmin, hasCustomAdmin });
+  } catch {
+    return res.json({ canRegister: false, hasCustomAdmin: true });
+  }
+});
+
+// Endpoint: Criar Administrador (permite primeiro administrador customizado ou requer autenticação)
+app.post('/api/admin/register', (req, res) => {
+  try {
+    const admins = getAdminUsers();
+    const hasCustomAdmin = admins.some((a) => a.username.toLowerCase() !== 'admin');
+
+    // Verifica autenticação se já houver um administrador customizado configurado
+    const authHeader = req.headers.authorization;
+    let isAuthenticated = false;
+    let requestingUser = 'setup-inicial';
+
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      const token = authHeader.substring(7).trim();
+      const session = activeSessions.get(token);
+      if (session && session.expiresAt >= Date.now()) {
+        isAuthenticated = true;
+        requestingUser = session.username;
+      }
+    }
+
+    if (hasCustomAdmin && !isAuthenticated) {
+      return res.status(401).json({
+        success: false,
+        message: 'Acesso restrito. Novos administradores só podem ser cadastrados por um administrador conectado.',
+      });
+    }
+
     const { username, password, name } = req.body;
     if (!username || !password || !name) {
       return res.status(400).json({ success: false, message: 'Todos os campos são obrigatórios.' });
@@ -619,26 +654,34 @@ app.post('/api/admin/register', requireAuth, (req, res) => {
       return res.status(400).json({ success: false, message: 'A senha deve ter no mínimo 6 caracteres.' });
     }
 
-    const admins = getAdminUsers();
     if (admins.some((a) => a.username.toLowerCase() === cleanUser)) {
-      return res.status(400).json({ success: false, message: 'Este usuário já está cadastrado.' });
+      return res.status(400).json({ success: false, message: 'Este usuário já está cadastrado. Faça login na aba Login.' });
     }
 
-    const updated: StoredAdmin[] = [
-      ...admins,
-      {
-        username: cleanUser,
-        passwordHash: hashPassword(cleanPass),
-        name: cleanName,
-        createdAt: Date.now(),
-      },
-    ];
+    const newAdmin: StoredAdmin = {
+      username: cleanUser,
+      passwordHash: hashPassword(cleanPass),
+      name: cleanName,
+      createdAt: Date.now(),
+    };
+
+    const updated: StoredAdmin[] = [...admins, newAdmin];
     atomicWriteJsonSync(ADMIN_USERS_FILE, updated);
-    console.log(`[Tomati Server] Novo administrador cadastrado por ${(req as any).adminUser.username}: ${cleanUser}`);
+    console.log(`[Tomati Server] Administrador cadastrado (${requestingUser}): ${cleanUser}`);
+
+    // Cria e retorna sessão ativa para autenticação imediata
+    const token = crypto.randomBytes(32).toString('hex');
+    activeSessions.set(token, {
+      username: cleanUser,
+      name: cleanName,
+      expiresAt: Date.now() + SESSION_DURATION_MS,
+    });
 
     return res.json({
       success: true,
+      token,
       user: { username: cleanUser, name: cleanName },
+      message: 'Administrador cadastrado com sucesso!',
     });
   } catch (error) {
     console.error('Erro no registro de admin:', error);

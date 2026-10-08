@@ -18,6 +18,7 @@ export const AdminAuthModal: React.FC<AdminAuthModalProps> = ({
   logoUrl,
 }) => {
   const [tab, setTab] = useState<'login' | 'register'>('login');
+  const [canRegister, setCanRegister] = useState(true);
 
   // Estados de Login
   const [loginUser, setLoginUser] = useState('');
@@ -34,6 +35,20 @@ export const AdminAuthModal: React.FC<AdminAuthModalProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
+
+  // Verificar se o cadastro inicial está liberado
+  useEffect(() => {
+    if (isOpen) {
+      fetch('/api/admin/setup-status')
+        .then((r) => r.json())
+        .then((d) => {
+          if (typeof d?.canRegister === 'boolean') {
+            setCanRegister(d.canRegister);
+          }
+        })
+        .catch(() => {});
+    }
+  }, [isOpen]);
 
   // Fechar com a tecla ESC
   useEffect(() => {
@@ -164,6 +179,22 @@ export const AdminAuthModal: React.FC<AdminAuthModalProps> = ({
       const data = await res.json();
 
       if (res.ok && data.success) {
+        if (data.token) {
+          const sessionPayload = JSON.stringify({
+            token: data.token,
+            user: data.user?.username || cleanUser,
+            name: data.user?.name || cleanName,
+            loggedAt: Date.now(),
+          });
+          localStorage.setItem(AUTH_TOKEN_KEY, sessionPayload);
+          setSuccessMsg('✅ Administrador cadastrado com sucesso! Entrando no painel...');
+          setTimeout(() => {
+            setIsLoading(false);
+            onLoginSuccess();
+          }, 450);
+          return;
+        }
+
         setSuccessMsg('Novo administrador cadastrado com sucesso! Agora você pode fazer login.');
         setTimeout(() => {
           setIsLoading(false);
