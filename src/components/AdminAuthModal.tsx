@@ -88,6 +88,10 @@ export const AdminAuthModal: React.FC<AdminAuthModalProps> = ({
           loggedAt: Date.now(),
         });
 
+        // Limpa previamente ambos os armazenamentos para evitar conflito de tokens antigos
+        localStorage.removeItem(AUTH_TOKEN_KEY);
+        sessionStorage.removeItem(AUTH_TOKEN_KEY);
+
         if (rememberMe) {
           localStorage.setItem(AUTH_TOKEN_KEY, sessionPayload);
         } else {

@@ -298,11 +298,71 @@ export const ClaudeWowPreview: React.FC<any> = () => {
   const [isPWAInstallModalOpen, setIsPWAInstallModalOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleOpenAdmin = () => {
-    if (isAdminAuthenticated) {
-      setIsAdminOpen(true);
-    } else {
+  // Estados de Gerenciamento de Administradores e Troca de Senha
+  const [currAdminUser, setCurrAdminUser] = useState<string>('');
+  const [adminUsersList, setAdminUsersList] = useState<Array<{ username: string; name: string; createdAt: number }>>([]);
+  const [curPass, setCurPass] = useState('');
+  const [newPass, setNewPass] = useState('');
+  const [newPassConfirm, setNewPassConfirm] = useState('');
+  const [passChangeLoading, setPassChangeLoading] = useState(false);
+  const [passChangeMsg, setPassChangeMsg] = useState('');
+
+  // Referência sempre atualizada do estado para evitar condições de corrida assíncronas em uploads
+  const dataRef = useRef(data);
+  useEffect(() => {
+    dataRef.current = data;
+  }, [data]);
+
+  // Atualizar dinamicamente o favicon na aba do navegador quando o usuário envia um novo
+  useEffect(() => {
+    if (data.img?.favicon) {
+      const links = document.querySelectorAll("link[rel*='icon']");
+      links.forEach((l) => ((l as HTMLLinkElement).href = data.img.favicon));
+    }
+  }, [data.img?.favicon]);
+
+  const loadAdminUsers = async () => {
+    const token = getAdminAuthToken();
+    if (!token) return;
+    try {
+      const res = await fetch('/api/admin/users', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const d = await res.json();
+        if (d.users) setAdminUsersList(d.users);
+      }
+    } catch {}
+  };
+
+  const handleOpenAdmin = async () => {
+    const token = getAdminAuthToken();
+    if (!token) {
+      setIsAdminAuthenticated(false);
       setIsAuthModalOpen(true);
+      return;
+    }
+
+    // Consulta ativa em /api/admin/me para garantir que o token é válido antes de abrir
+    try {
+      const res = await fetch('/api/admin/me', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const me = await res.json();
+        if (me.user?.username) setCurrAdminUser(me.user.username);
+        setIsAdminAuthenticated(true);
+        setIsAdminOpen(true);
+        loadAdminUsers();
+      } else {
+        localStorage.removeItem('tomati_admin_session_v1');
+        sessionStorage.removeItem('tomati_admin_session_v1');
+        setIsAdminAuthenticated(false);
+        setIsAuthModalOpen(true);
+      }
+    } catch {
+      // Em modo de falha de rede temporária
+      setIsAdminOpen(true);
     }
   };
 
@@ -345,8 +405,8 @@ export const ClaudeWowPreview: React.FC<any> = () => {
       })
       .catch((err) => {
         if (!isMounted) return;
-        console.info('[Tomati] Servidor local/offline, mantendo dados do navegador:', err);
-        setSyncStatus('online');
+        console.info('[Tomati] Servidor inacessível, mantendo cache local:', err);
+        setSyncStatus('erro');
       });
 
     return () => {
@@ -383,8 +443,8 @@ export const ClaudeWowPreview: React.FC<any> = () => {
     return base64Data;
   };
 
-  // Salvar no estado, no localStorage e persistir no servidor (apenas quando solicitado ou ao subir imagem)
-  const persistData = async (updated: typeof D) => {
+  // Salvar no estado, no localStorage e persistir no servidor (retorna Promise<boolean> para confirmação real)
+  const persistData = async (updated: typeof D): Promise<boolean> => {
     setData(updated);
     try {
       localStorage.setItem(K, JSON.stringify(updated));
@@ -396,7 +456,7 @@ export const ClaudeWowPreview: React.FC<any> = () => {
       setAdminMsg('⚠️ Faça login como administrador para salvar no servidor.');
       setIsAdminAuthenticated(false);
       setIsAuthModalOpen(true);
-      return;
+      return false;
     }
 
     try {
@@ -415,19 +475,23 @@ export const ClaudeWowPreview: React.FC<any> = () => {
         const now = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
         setLastSavedTime(now);
         setAdminMsg(`✅ Salvo com sucesso no servidor às ${now}! Online para todos.`);
+        return true;
       } else if (res.status === 401) {
         setSyncStatus('erro');
         setAdminMsg('⚠️ Sessão de administrador expirada. Faça login novamente.');
         setIsAdminAuthenticated(false);
         setIsAuthModalOpen(true);
+        return false;
       } else {
         setSyncStatus('erro');
         setAdminMsg('⚠️ Erro ao salvar alterações no servidor.');
+        return false;
       }
     } catch (err) {
       setSyncStatus('erro');
       console.warn('Erro ao salvar no servidor:', err);
       setAdminMsg('❌ Falha na conexão com o servidor.');
+      return false;
     }
   };
 
@@ -529,25 +593,37 @@ export const ClaudeWowPreview: React.FC<any> = () => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    setAdminMsg('Processando imagem e sincronizando online...');
+    setAdminMsg('Processando imagem e enviando ao servidor...');
 
     if (isProduct !== undefined) {
       compressImage(file, 900, 'image/webp', async (base64) => {
         const serverUrl = await uploadImageToServer(base64, `prod-${isProduct}`);
-        const next = clone(data);
-        next.produtos[isProduct].img = serverUrl;
-        await persistData(next);
-        setAdminMsg('Foto do produto salva e online para todos!');
+        const current = dataRef.current || data;
+        const next = clone(current);
+        if (next.produtos && next.produtos[isProduct]) {
+          next.produtos[isProduct].img = serverUrl;
+          const ok = await persistData(next);
+          if (ok) {
+            setAdminMsg('Foto do produto salva e publicada com sucesso!');
+          } else {
+            setAdminMsg('⚠️ Foto carregada, mas houve erro ao salvar no servidor.');
+          }
+        }
       });
     } else {
       const maxW = fieldKey === 'logo' ? 600 : 128;
       compressImage(file, maxW, 'image/png', async (base64) => {
         const serverUrl = await uploadImageToServer(base64, `brand-${fieldKey}`);
-        const next = clone(data);
+        const current = dataRef.current || data;
+        const next = clone(current);
         if (!next.img) next.img = { logo: '', favicon: '' };
         (next.img as any)[fieldKey] = serverUrl;
-        await persistData(next);
-        setAdminMsg('Imagem salva e online para todos!');
+        const ok = await persistData(next);
+        if (ok) {
+          setAdminMsg('Imagem da marca salva e publicada com sucesso!');
+        } else {
+          setAdminMsg('⚠️ Imagem carregada, mas houve erro ao salvar no servidor.');
+        }
       });
     }
   };
@@ -622,13 +698,31 @@ export const ClaudeWowPreview: React.FC<any> = () => {
   const handleImportJson = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    file.text().then((text) => {
+    file.text().then(async (text) => {
       try {
         const parsed = JSON.parse(text);
-        persistData({ ...clone(D), ...parsed });
-        setAdminMsg('Configuração importada com sucesso.');
+        if (!parsed || typeof parsed !== 'object') {
+          setAdminMsg('Arquivo JSON inválido.');
+          return;
+        }
+        const normalized = {
+          ...clone(D),
+          ...parsed,
+          links: { ...clone(D.links), ...(parsed.links || {}) },
+          handles: { ...clone(D.handles), ...(parsed.handles || {}) },
+          img: { ...clone(D.img), ...(parsed.img || {}) },
+          t: { ...clone(D.t), ...(parsed.t || {}) },
+          menu: Array.isArray(parsed.menu) ? parsed.menu : clone(D.menu),
+          produtos: Array.isArray(parsed.produtos) ? parsed.produtos : clone(D.produtos),
+        };
+        const ok = await persistData(normalized);
+        if (ok) {
+          setAdminMsg('Configuração importada e salva com sucesso.');
+        } else {
+          setAdminMsg('Configuração carregada localmente. Clique em Salvar para gravar.');
+        }
       } catch {
-        setAdminMsg('Arquivo JSON inválido.');
+        setAdminMsg('Erro ao ler arquivo JSON.');
       }
     });
   };
@@ -648,29 +742,93 @@ export const ClaudeWowPreview: React.FC<any> = () => {
     setAdminMsg('Valores padrão restaurados.');
   };
 
-  const handleDownloadPage = () => {
-    const htmlString = `<!doctype html>
-<html lang="pt-BR">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Tomati | Comida que faz bem, a dois toques</title>
-<meta name="theme-color" content="#0F3B2A">
-<meta property="og:title" content="Tomati | Comida que faz bem, a dois toques">
-<link id="fav" rel="icon" href="${data.img?.favicon || "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='50' fill='%23E63B1F'/%3E%3Ctext x='50' y='68' font-size='56' font-family='Arial' font-weight='800' fill='white' text-anchor='middle'%3Et.%3C/text%3E%3C/svg%3E"}">
-<meta name="description" content="A Tomati reúne marcas de alimentação saudável em Curitiba. Peça no portal ou no iFood.">
-</head>
-<body>
-<!-- Tomati standalone export -->
-<script>/*D*/const D=${JSON.stringify(data)};/*D*/</script>
-</body>
-</html>`;
-    const blob = new Blob([htmlString], { type: 'text/html' });
+  const handleExportBackup = () => {
+    const jsonString = JSON.stringify(data, null, 2);
+    const blob = new Blob([jsonString], { type: 'application/json' });
     const link = document.createElement('a');
+    const dateStr = new Date().toISOString().split('T')[0];
     link.href = URL.createObjectURL(blob);
-    link.download = 'tomati.html';
+    link.download = `tomati-backup-${dateStr}.json`;
     link.click();
-    setAdminMsg('Download iniciado.');
+    setAdminMsg('Backup (.json) exportado com sucesso.');
+  };
+
+  const handleChangePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setPassChangeMsg('');
+    if (!curPass || !newPass) {
+      setPassChangeMsg('⚠️ Preencha a senha atual e a nova senha.');
+      return;
+    }
+    if (newPass.length < 6) {
+      setPassChangeMsg('⚠️ A nova senha deve ter no mínimo 6 caracteres.');
+      return;
+    }
+    if (newPass !== newPassConfirm) {
+      setPassChangeMsg('⚠️ A confirmação da nova senha não confere.');
+      return;
+    }
+    const token = getAdminAuthToken();
+    if (!token) return;
+    setPassChangeLoading(true);
+    try {
+      const res = await fetch('/api/admin/change-password', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ currentPassword: curPass, newPassword: newPass }),
+      });
+      const result = await res.json();
+      if (res.ok && result.success) {
+        setPassChangeMsg('✅ Senha alterada com sucesso!');
+        setCurPass('');
+        setNewPass('');
+        setNewPassConfirm('');
+        if (result.token) {
+          try {
+            const raw = localStorage.getItem('tomati_admin_session_v1') || sessionStorage.getItem('tomati_admin_session_v1');
+            if (raw) {
+              const parsed = JSON.parse(raw);
+              parsed.token = result.token;
+              if (localStorage.getItem('tomati_admin_session_v1')) {
+                localStorage.setItem('tomati_admin_session_v1', JSON.stringify(parsed));
+              } else {
+                sessionStorage.setItem('tomati_admin_session_v1', JSON.stringify(parsed));
+              }
+            }
+          } catch {}
+        }
+      } else {
+        setPassChangeMsg(`⚠️ ${result.message || 'Erro ao alterar senha.'}`);
+      }
+    } catch {
+      setPassChangeMsg('❌ Erro de conexão ao alterar senha.');
+    } finally {
+      setPassChangeLoading(false);
+    }
+  };
+
+  const handleDeleteAdmin = async (targetUsername: string) => {
+    if (!window.confirm(`Tem certeza que deseja excluir o administrador @${targetUsername}?`)) return;
+    const token = getAdminAuthToken();
+    if (!token) return;
+    try {
+      const res = await fetch(`/api/admin/users/${encodeURIComponent(targetUsername)}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const result = await res.json();
+      if (res.ok && result.success) {
+        setAdminMsg(`✅ Administrador @${targetUsername} excluído.`);
+        loadAdminUsers();
+      } else {
+        setAdminMsg(`⚠️ ${result.message || 'Erro ao excluir administrador.'}`);
+      }
+    } catch {
+      setAdminMsg('❌ Falha na conexão ao excluir administrador.');
+    }
   };
 
   const activeProducts = data.produtos.filter((p: any) => !p.camp);
@@ -1746,6 +1904,133 @@ export const ClaudeWowPreview: React.FC<any> = () => {
 
           <button type="button" onClick={handleAddProduct}>+ Novo produto</button>
 
+          {/* Segurança & Contas de Acesso */}
+          <h4>Segurança & Contas de Acesso</h4>
+          <div style={{ background: 'rgba(255,255,255,0.05)', padding: '12px', borderRadius: '10px', marginBottom: '12px' }}>
+            <h5 style={{ margin: '0 0 8px 0', fontSize: '13px', color: '#FFC93C', fontWeight: 700 }}>
+              Alterar Minha Senha
+            </h5>
+            <form onSubmit={handleChangePassword} style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <label style={{ fontSize: '12px', margin: 0 }}>
+                Senha atual
+                <input
+                  type="password"
+                  placeholder="Sua senha atual"
+                  value={curPass}
+                  onChange={(e) => setCurPass(e.target.value)}
+                  style={{ width: '100%', marginTop: '3px' }}
+                />
+              </label>
+              <label style={{ fontSize: '12px', margin: 0 }}>
+                Nova senha
+                <input
+                  type="password"
+                  placeholder="Mínimo 6 caracteres"
+                  value={newPass}
+                  onChange={(e) => setNewPass(e.target.value)}
+                  style={{ width: '100%', marginTop: '3px' }}
+                />
+              </label>
+              <label style={{ fontSize: '12px', margin: 0 }}>
+                Confirmar nova senha
+                <input
+                  type="password"
+                  placeholder="Repita a nova senha"
+                  value={newPassConfirm}
+                  onChange={(e) => setNewPassConfirm(e.target.value)}
+                  style={{ width: '100%', marginTop: '3px' }}
+                />
+              </label>
+              {passChangeMsg && (
+                <div style={{ fontSize: '12px', padding: '6px 8px', borderRadius: '6px', background: 'rgba(255,255,255,0.1)' }}>
+                  {passChangeMsg}
+                </div>
+              )}
+              <button
+                type="submit"
+                disabled={passChangeLoading}
+                style={{
+                  marginTop: '4px',
+                  background: '#1F5A3F',
+                  color: '#ffffff',
+                  fontWeight: 600,
+                  fontSize: '12px',
+                  padding: '7px 12px',
+                  border: 'none',
+                  borderRadius: '6px',
+                  cursor: passChangeLoading ? 'wait' : 'pointer'
+                }}
+              >
+                {passChangeLoading ? 'Alterando...' : 'Salvar Nova Senha'}
+              </button>
+            </form>
+          </div>
+
+          <div style={{ background: 'rgba(255,255,255,0.05)', padding: '12px', borderRadius: '10px', marginBottom: '14px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+              <h5 style={{ margin: 0, fontSize: '13px', color: '#FFC93C', fontWeight: 700 }}>
+                Administradores Cadastrados
+              </h5>
+              <button
+                type="button"
+                onClick={loadAdminUsers}
+                style={{ fontSize: '11px', padding: '2px 8px', borderRadius: '4px', background: 'transparent', border: '1px solid rgba(255,255,255,0.2)', color: '#fff' }}
+              >
+                Atualizar
+              </button>
+            </div>
+            {adminUsersList.length === 0 ? (
+              <p style={{ fontSize: '12px', opacity: 0.7, margin: 0 }}>Carregando lista...</p>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                {adminUsersList.map((adm) => {
+                  const isCurrent = adm.username.toLowerCase() === currAdminUser.toLowerCase();
+                  return (
+                    <div
+                      key={adm.username}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        padding: '6px 8px',
+                        borderRadius: '6px',
+                        background: 'rgba(255,255,255,0.04)',
+                        fontSize: '12px',
+                      }}
+                    >
+                      <div>
+                        <b>@{adm.username}</b>
+                        <span style={{ opacity: 0.7, marginLeft: '6px' }}>({adm.name})</span>
+                        {isCurrent && (
+                          <span style={{ marginLeft: '6px', fontSize: '10px', background: '#FFC93C', color: '#14201A', padding: '1px 5px', borderRadius: '4px', fontWeight: 700 }}>
+                            Você
+                          </span>
+                        )}
+                      </div>
+                      {!isCurrent && (
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteAdmin(adm.username)}
+                          style={{
+                            fontSize: '11px',
+                            color: '#ff4d4f',
+                            border: '1px solid rgba(255,77,79,0.3)',
+                            background: 'transparent',
+                            padding: '2px 6px',
+                            borderRadius: '4px',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          Excluir
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
           {/* Publicar e sincronizar */}
           <h4>Sincronização e backup</h4>
           <button
@@ -1756,7 +2041,7 @@ export const ClaudeWowPreview: React.FC<any> = () => {
           >
             Salvar tudo online agora
           </button>
-          <button type="button" onClick={handleDownloadPage}>Baixar página (.html)</button>
+          <button type="button" onClick={handleExportBackup}>Exportar backup da loja (.json)</button>
           <button type="button" onClick={handleCopyConfig}>Copiar configuração</button>
 
           <label>

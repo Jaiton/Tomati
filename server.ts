@@ -11,6 +11,9 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// Configuração segura de proxy reverso (Cloud Run / AI Studio / Vercel)
+app.set('trust proxy', 1);
+
 // Body parsers com limite seguro de 8MB (ideal para imagens WebP/PNG de alta resolução)
 app.use(express.json({ limit: '8mb' }));
 app.use(express.urlencoded({ extended: true, limit: '8mb' }));
@@ -64,6 +67,27 @@ function verifyPassword(password: string, stored: string): boolean {
   } catch {
     return false;
   }
+}
+
+// Validação binária rigorosa de imagens via Magic Bytes (evita arquivos falsos disfarçados)
+function detectImageFormat(buf: Buffer): 'png' | 'jpg' | 'webp' | null {
+  if (!buf || buf.length < 12) return null;
+  // PNG: 89 50 4E 47
+  if (buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4E && buf[3] === 0x47) {
+    return 'png';
+  }
+  // JPEG: FF D8 FF
+  if (buf[0] === 0xFF && buf[1] === 0xD8 && buf[2] === 0xFF) {
+    return 'jpg';
+  }
+  // WebP: RIFF (bytes 0-3) e WEBP (bytes 8-11)
+  if (
+    buf[0] === 0x52 && buf[1] === 0x49 && buf[2] === 0x46 && buf[3] === 0x46 &&
+    buf[8] === 0x57 && buf[9] === 0x45 && buf[10] === 0x42 && buf[11] === 0x50
+  ) {
+    return 'webp';
+  }
+  return null;
 }
 
 // Middleware de Autenticação Obrigatória para rotas sensíveis
@@ -201,20 +225,109 @@ const DEFAULT_STORE_DATA = {
   ],
 };
 
-// Obter ou inicializar store-data.json
+// Utilitário de Gravação Atômica de Arquivos (evita arquivos corrompidos em quedas ou falhas)
+function atomicWriteJsonSync(filePath: string, data: any) {
+  const tempPath = `${filePath}.tmp-${Date.now()}-${crypto.randomBytes(4).toString('hex')}`;
+  fs.writeFileSync(tempPath, JSON.stringify(data, null, 2), 'utf-8');
+  fs.renameSync(tempPath, filePath);
+}
+
+// Sanitização rigorosa de URLs (bloqueia javascript:, data: e scripts maliciosos)
+function sanitizeUrl(rawUrl: any): string {
+  if (typeof rawUrl !== 'string') return '';
+  const trimmed = rawUrl.trim();
+  if (!trimmed) return '';
+  if (trimmed.startsWith('#') || trimmed.startsWith('/')) {
+    return trimmed;
+  }
+  const lower = trimmed.toLowerCase();
+  if (lower.startsWith('javascript:') || lower.startsWith('data:') || lower.startsWith('vbscript:')) {
+    return '#';
+  }
+  if (lower.startsWith('https://') || lower.startsWith('http://') || lower.startsWith('mailto:') || lower.startsWith('tel:')) {
+    return trimmed;
+  }
+  if (/^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/.test(trimmed)) {
+    return `https://${trimmed}`;
+  }
+  return '#';
+}
+
+// Normalização de Schema: garante que campos essenciais nunca sejam nulos ou derrubem a interface
+function normalizeStoreData(input: any) {
+  if (!input || typeof input !== 'object') return { ...DEFAULT_STORE_DATA };
+
+  const rawLinks = { ...DEFAULT_STORE_DATA.links, ...(input.links || {}) };
+  const sanitizedLinks: Record<string, string> = {};
+  for (const [k, v] of Object.entries(rawLinks)) {
+    sanitizedLinks[k] = sanitizeUrl(v);
+  }
+
+  const rawMenu = Array.isArray(input.menu) ? input.menu : DEFAULT_STORE_DATA.menu;
+  const sanitizedMenu = rawMenu.map((m: any) => ({
+    id: String(m?.id || Date.now()),
+    title: String(m?.title || 'Menu'),
+    url: sanitizeUrl(m?.url || '#'),
+  }));
+
+  const rawProducts = Array.isArray(input.produtos) ? input.produtos : DEFAULT_STORE_DATA.produtos;
+  const sanitizedProducts = rawProducts.map((p: any) => ({
+    ...p,
+    nome: String(p?.nome || 'Produto'),
+    texto: String(p?.texto || ''),
+    price: String(p?.price || ''),
+    link: typeof p?.link === 'string' ? p.link : 'portal',
+    cta: String(p?.cta || 'Pedir agora'),
+    img: typeof p?.img === 'string' && (p.img.startsWith('/uploads') || p.img.startsWith('http')) ? p.img : '',
+  }));
+
+  return {
+    ...DEFAULT_STORE_DATA,
+    ...input,
+    links: sanitizedLinks,
+    handles: { ...DEFAULT_STORE_DATA.handles, ...(input.handles || {}) },
+    img: {
+      logo: typeof input.img?.logo === 'string' ? input.img.logo : '',
+      favicon: typeof input.img?.favicon === 'string' ? input.img.favicon : '',
+    },
+    t: { ...DEFAULT_STORE_DATA.t, ...(input.t || {}) },
+    menu: sanitizedMenu,
+    // Permite explicitamente vitrine vazia (produtos: []) sem forçar restauração!
+    produtos: sanitizedProducts,
+  };
+}
+
+// Obter ou inicializar store-data.json com proteção contra corrupção
 function getStoreData() {
   if (fs.existsSync(STORE_DATA_FILE)) {
     try {
       const raw = fs.readFileSync(STORE_DATA_FILE, 'utf-8');
       const parsed = JSON.parse(raw);
-      if (parsed && Array.isArray(parsed.produtos) && parsed.produtos.length > 0) {
-        return parsed;
+      if (parsed && typeof parsed === 'object' && Array.isArray(parsed.produtos)) {
+        return normalizeStoreData(parsed);
       }
-    } catch {
-      // Ignora erro e usa padrão
+    } catch (err) {
+      console.warn('[Tomati Server] store-data.json com erro. Tentando recuperar do backup...', err);
+      // Preserva o arquivo corrompido para não perder nada
+      try {
+        fs.copyFileSync(STORE_DATA_FILE, path.join(DATA_DIR, `store-data.corrupted-${Date.now()}.json`));
+      } catch {}
+
+      // Tenta recuperar do backup mais recente
+      const backupFile = path.join(DATA_DIR, 'store-data.backup.json');
+      if (fs.existsSync(backupFile)) {
+        try {
+          const rawBackup = fs.readFileSync(backupFile, 'utf-8');
+          const parsedBackup = JSON.parse(rawBackup);
+          if (parsedBackup && typeof parsedBackup === 'object' && Array.isArray(parsedBackup.produtos)) {
+            console.log('[Tomati Server] Dados recuperados com sucesso do backup!');
+            return normalizeStoreData(parsedBackup);
+          }
+        } catch {}
+      }
     }
   }
-  fs.writeFileSync(STORE_DATA_FILE, JSON.stringify(DEFAULT_STORE_DATA, null, 2), 'utf-8');
+  atomicWriteJsonSync(STORE_DATA_FILE, DEFAULT_STORE_DATA);
   return DEFAULT_STORE_DATA;
 }
 
@@ -243,7 +356,7 @@ function getAdminUsers(): StoredAdmin[] {
           return admin;
         });
         if (migrated) {
-          fs.writeFileSync(ADMIN_USERS_FILE, JSON.stringify(normalized, null, 2), 'utf-8');
+          atomicWriteJsonSync(ADMIN_USERS_FILE, normalized);
         }
         return normalized;
       }
@@ -252,8 +365,8 @@ function getAdminUsers(): StoredAdmin[] {
     }
   }
 
-  // Senha inicial protegida com hash seguro
-  const initialPassword = process.env.ADMIN_INITIAL_PASSWORD || 'tomati2026';
+  // Senha inicial protegida com hash seguro (configurada via env ou gerada aleatoriamente na inicialização)
+  const initialPassword = process.env.ADMIN_INITIAL_PASSWORD || crypto.randomBytes(8).toString('hex');
   const defaultAdmins: StoredAdmin[] = [
     {
       username: 'admin',
@@ -262,7 +375,10 @@ function getAdminUsers(): StoredAdmin[] {
       createdAt: Date.now(),
     },
   ];
-  fs.writeFileSync(ADMIN_USERS_FILE, JSON.stringify(defaultAdmins, null, 2), 'utf-8');
+  atomicWriteJsonSync(ADMIN_USERS_FILE, defaultAdmins);
+  if (!process.env.ADMIN_INITIAL_PASSWORD) {
+    console.log(`[Tomati Security] Administrador inicial 'admin' gerado com chave criptografada.`);
+  }
   return defaultAdmins;
 }
 
@@ -292,9 +408,10 @@ app.post('/api/store-data', requireAuth, (req, res) => {
       }
     } catch {}
 
-    fs.writeFileSync(STORE_DATA_FILE, JSON.stringify(payload, null, 2), 'utf-8');
+    const normalized = normalizeStoreData(payload);
+    atomicWriteJsonSync(STORE_DATA_FILE, normalized);
     const user = (req as any).adminUser?.username || 'admin';
-    console.log(`[Tomati Server] store-data.json atualizado por ${user}. ${payload.produtos.length} produtos.`);
+    console.log(`[Tomati Server] store-data.json atualizado por ${user}. ${normalized.produtos.length} produtos.`);
     return res.json({ success: true, timestamp: Date.now() });
   } catch (error) {
     console.error('Erro ao salvar store-data.json:', error);
@@ -302,34 +419,29 @@ app.post('/api/store-data', requireAuth, (req, res) => {
   }
 });
 
-// Endpoint PROTEGIDO: Upload seguro de imagem (WebP, PNG, JPG apenas; SVG é expressamente proibido)
+// Endpoint PROTEGIDO: Upload seguro de imagem com validação real de Magic Bytes
 app.post('/api/upload', requireAuth, (req, res) => {
   try {
-    const { data, filename, prefix } = req.body;
+    const { data, prefix } = req.body;
     if (!data || typeof data !== 'string') {
       return res.status(400).json({ error: 'Dados da imagem não fornecidos' });
     }
 
-    // Bloqueio rigoroso contra SVG (para impedir execução de scripts XSS)
-    if (data.toLowerCase().includes('svg') || data.toLowerCase().includes('<script') || data.toLowerCase().includes('xml')) {
-      return res.status(400).json({ error: 'Formato SVG ou scripts não são permitidos por segurança. Use WebP, PNG ou JPG.' });
-    }
-
     const matches = data.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
     let buffer: Buffer;
-    let ext = 'webp';
 
     if (matches && matches.length === 3) {
-      const mime = matches[1].toLowerCase();
-      if (mime.includes('png')) ext = 'png';
-      else if (mime.includes('jpeg') || mime.includes('jpg')) ext = 'jpg';
-      else if (mime.includes('webp')) ext = 'webp';
-      else {
-        return res.status(400).json({ error: 'Apenas imagens PNG, JPG ou WebP são permitidas.' });
-      }
       buffer = Buffer.from(matches[2], 'base64');
     } else {
       buffer = Buffer.from(data, 'base64');
+    }
+
+    // Validação real de cabeçalho binário (Magic Bytes)
+    const detectedExt = detectImageFormat(buffer);
+    if (!detectedExt) {
+      return res.status(400).json({
+        error: 'Arquivo inválido. O arquivo enviado deve ser uma imagem válida (PNG, JPG ou WebP).',
+      });
     }
 
     // Limite de 5MB por arquivo
@@ -339,7 +451,7 @@ app.post('/api/upload', requireAuth, (req, res) => {
 
     const cleanPrefix = (prefix || 'img').replace(/[^a-z0-9_-]/gi, '').slice(0, 20);
     const uniqueId = crypto.randomBytes(8).toString('hex');
-    const safeName = `${cleanPrefix}-${Date.now()}-${uniqueId}.${ext}`;
+    const safeName = `${cleanPrefix}-${Date.now()}-${uniqueId}.${detectedExt}`;
 
     const filePath = path.join(UPLOADS_DIR, safeName);
     fs.writeFileSync(filePath, buffer);
@@ -363,7 +475,8 @@ app.post('/api/upload', requireAuth, (req, res) => {
 // Endpoint: Login com Proteção contra Força Bruta e Hash Seguro
 app.post('/api/admin/login', (req, res) => {
   try {
-    const clientIp = (req.headers['x-forwarded-for'] as string)?.split(',')[0] || req.ip || '127.0.0.1';
+    // Com app.set('trust proxy', 1), req.ip lê confiavelmente o IP do cliente real
+    const clientIp = req.ip || (req.socket && req.socket.remoteAddress) || '127.0.0.1';
     const now = Date.now();
 
     // Checar bloqueio temporário
@@ -468,7 +581,22 @@ app.post('/api/admin/change-password', requireAuth, (req, res) => {
     admins[adminIndex].passwordHash = hashPassword(String(newPassword).trim());
     fs.writeFileSync(ADMIN_USERS_FILE, JSON.stringify(admins, null, 2), 'utf-8');
 
-    return res.json({ success: true, message: 'Senha alterada com sucesso!' });
+    // Invalida todas as sessões anteriores deste administrador
+    for (const [t, s] of activeSessions.entries()) {
+      if (s.username.toLowerCase() === session.username.toLowerCase()) {
+        activeSessions.delete(t);
+      }
+    }
+
+    // Emite novo token exclusivo para a sessão atual
+    const newToken = crypto.randomBytes(32).toString('hex');
+    activeSessions.set(newToken, {
+      username: session.username,
+      name: session.name,
+      expiresAt: Date.now() + SESSION_DURATION_MS,
+    });
+
+    return res.json({ success: true, message: 'Senha alterada com sucesso!', token: newToken });
   } catch (error) {
     console.error('Erro ao trocar senha:', error);
     return res.status(500).json({ success: false, message: 'Erro interno ao trocar senha.' });
@@ -505,7 +633,7 @@ app.post('/api/admin/register', requireAuth, (req, res) => {
         createdAt: Date.now(),
       },
     ];
-    fs.writeFileSync(ADMIN_USERS_FILE, JSON.stringify(updated, null, 2), 'utf-8');
+    atomicWriteJsonSync(ADMIN_USERS_FILE, updated);
     console.log(`[Tomati Server] Novo administrador cadastrado por ${(req as any).adminUser.username}: ${cleanUser}`);
 
     return res.json({
@@ -515,6 +643,60 @@ app.post('/api/admin/register', requireAuth, (req, res) => {
   } catch (error) {
     console.error('Erro no registro de admin:', error);
     return res.status(500).json({ success: false, message: 'Erro interno ao registrar administrador.' });
+  }
+});
+
+// Endpoint PROTEGIDO: Listar Administradores Cadastrados
+app.get('/api/admin/users', requireAuth, (_req, res) => {
+  try {
+    const admins = getAdminUsers();
+    const sanitized = admins.map((a) => ({
+      username: a.username,
+      name: a.name,
+      createdAt: a.createdAt,
+    }));
+    return res.json({ success: true, users: sanitized });
+  } catch (error) {
+    console.error('Erro ao listar administradores:', error);
+    return res.status(500).json({ success: false, message: 'Erro ao listar administradores.' });
+  }
+});
+
+// Endpoint PROTEGIDO: Excluir Administrador
+app.delete('/api/admin/users/:username', requireAuth, (req, res) => {
+  try {
+    const targetUser = String(req.params.username).trim().toLowerCase();
+    const currentUser = (req as any).adminUser.username.toLowerCase();
+
+    if (targetUser === currentUser) {
+      return res.status(400).json({ success: false, message: 'Você não pode excluir sua própria conta de administrador enquanto estiver conectado.' });
+    }
+
+    const admins = getAdminUsers();
+    if (admins.length <= 1) {
+      return res.status(400).json({ success: false, message: 'Não é possível excluir o único administrador do sistema.' });
+    }
+
+    const exists = admins.some((a) => a.username.toLowerCase() === targetUser);
+    if (!exists) {
+      return res.status(404).json({ success: false, message: 'Administrador não encontrado.' });
+    }
+
+    const filtered = admins.filter((a) => a.username.toLowerCase() !== targetUser);
+    atomicWriteJsonSync(ADMIN_USERS_FILE, filtered);
+
+    // Invalida sessões ativas do usuário excluído
+    for (const [token, session] of activeSessions.entries()) {
+      if (session.username.toLowerCase() === targetUser) {
+        activeSessions.delete(token);
+      }
+    }
+
+    console.log(`[Tomati Server] Administrador '${targetUser}' excluído por '${currentUser}'.`);
+    return res.json({ success: true, message: `Administrador ${targetUser} excluído com sucesso.` });
+  } catch (error) {
+    console.error('Erro ao excluir administrador:', error);
+    return res.status(500).json({ success: false, message: 'Erro interno ao excluir administrador.' });
   }
 });
 
