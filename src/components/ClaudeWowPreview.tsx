@@ -4,7 +4,7 @@ import { AdminAuthModal } from './AdminAuthModal';
 import { PWAInstallModal } from './PWAInstallModal';
 import { Menu, X, Smartphone, Download, MapPin, Clock, Phone, ShoppingBag, ArrowRight } from 'lucide-react';
 
-// Configuração padrão idêntica ao código do Claude
+// Configuração padrão idêntica ao código da Tomati
 const D = {
   links: {
     portal: 'https://pedido.tomati.com.br',
@@ -21,26 +21,26 @@ const D = {
     favicon: '',
   },
   menu: [
-    { id: '1', title: 'Na Vitrini', url: '#produtos' },
+    { id: '1', title: 'Na Vitrine', url: '#produtos' },
     { id: '2', title: 'Sobre', url: '#sobre' },
     { id: '3', title: 'Onde comprar', url: '#onde' },
   ],
   regiao: 'Curitiba e Região',
-  horario: 'Segunda a Sábado: 08h às 21h · Domingo: 09h às 18h',
-  contato: '(41) 99999-8888 · contato@tomatibrasil.com.br',
+  horario: '',
+  contato: '',
   t: {
     hero_h: 'Comida que faz bem, a dois toques.',
     hero_p: 'Marcas de alimentação saudável que a gente seleciona, num só lugar. Escolha o canal e peça.',
     sobre_h: 'Menos complicação, mais comida boa.',
     sobre_p: 'A Tomati reúne em um só lugar marcas de alimentação saudável que a gente gosta de recomendar. A ideia é simples: facilitar a sua rotina, para o que faz bem chegar até você sem esforço.',
-    sobre_x: 'Curadoria de produtos limpos, sem excessos, com sabor autêntico e entrega rápida em Curitiba.',
+    sobre_x: 'Curadoria de produtos selecionados, com sabor autêntico e entrega rápida em Curitiba.',
     fim_h: 'Bom pra você. Fácil de pedir.',
   },
   produtos: [
     {
       nome: 'Hey! Mu',
       texto: 'Doce de leite zero açúcar.',
-      price: 'A partir de R$ 29,90',
+      price: '',
       link: 'portal',
       cta: 'Quero experimentar',
       bg: '#FFC93C',
@@ -53,7 +53,7 @@ const D = {
     {
       nome: 'Naveia',
       texto: 'Bebidas de aveia.',
-      price: 'Barista & Original',
+      price: '',
       link: 'portal',
       cta: 'Ver no portal',
       bg: '#1F5A3F',
@@ -66,7 +66,7 @@ const D = {
     {
       nome: 'Tocca',
       texto: 'Pastas de amendoim.',
-      price: 'Pura energia',
+      price: '',
       link: 'ifood',
       cta: 'Pedir agora',
       bg: '#D9A066',
@@ -79,7 +79,7 @@ const D = {
     {
       nome: 'Yok-k!',
       texto: 'Macarrão sem glúten.',
-      price: 'Penne & Fusilli',
+      price: '',
       link: 'portal',
       cta: 'Quero experimentar',
       bg: '#E63B1F',
@@ -92,7 +92,7 @@ const D = {
     {
       nome: 'Fruit-Titus',
       texto: 'Frutas com chocolate 70%.',
-      price: 'Morango & Banana',
+      price: '',
       link: 'ifood',
       cta: 'Pedir agora',
       bg: '#3E2112',
@@ -104,7 +104,7 @@ const D = {
     },
     {
       nome: 'Sua campanha aqui',
-      texto: 'Combine doces sem açúcar, aveia e snacks saudáveis num só pedido em Curitiba.',
+      texto: 'Combine marcas saudáveis e snacks num só pedido em Curitiba.',
       price: '',
       link: 'portal',
       cta: 'Ver no portal',
@@ -253,6 +253,18 @@ function compressImage(file: File, maxWidth: number, mimeType: string, callback:
   }
 }
 
+// Obter token de autenticação seguro da sessão
+function getAdminAuthToken(): string {
+  try {
+    const raw = localStorage.getItem('tomati_admin_session_v1') || sessionStorage.getItem('tomati_admin_session_v1');
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      return parsed.token || '';
+    }
+  } catch {}
+  return '';
+}
+
 export const ClaudeWowPreview: React.FC<any> = () => {
   // Estado local sincronizado com localStorage
   const [data, setData] = useState<typeof D>(() => {
@@ -271,10 +283,11 @@ export const ClaudeWowPreview: React.FC<any> = () => {
   const [adminMsg, setAdminMsg] = useState('');
   const [syncStatus, setSyncStatus] = useState<'online' | 'salvando' | 'erro' | 'carregando'>('carregando');
   const [lastSavedTime, setLastSavedTime] = useState<string>('');
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [isAdminAuthenticated, setIsAdminAuthenticated] = useState<boolean>(() => {
     try {
-      return Boolean(localStorage.getItem('tomati_admin_session_v1') || sessionStorage.getItem('tomati_admin_session_v1'));
+      return Boolean(getAdminAuthToken());
     } catch {
       return false;
     }
@@ -295,6 +308,13 @@ export const ClaudeWowPreview: React.FC<any> = () => {
 
   const handleLogout = () => {
     try {
+      const token = getAdminAuthToken();
+      if (token) {
+        fetch('/api/admin/logout', {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}` },
+        }).catch(() => {});
+      }
       localStorage.removeItem('tomati_admin_session_v1');
       sessionStorage.removeItem('tomati_admin_session_v1');
     } catch {}
@@ -334,53 +354,80 @@ export const ClaudeWowPreview: React.FC<any> = () => {
     };
   }, []);
 
-  // Upload de arquivo para o servidor (/uploads) para não pesar o navegador e ficar online
+  // Upload de arquivo para o servidor (/uploads) com autenticação Bearer
   const uploadImageToServer = async (base64Data: string, prefix: string): Promise<string> => {
     try {
+      const token = getAdminAuthToken();
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
       const res = await fetch('/api/upload', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({ data: base64Data, prefix }),
       });
       if (res.ok) {
         const json = await res.json();
         if (json.url) return json.url;
+      } else if (res.status === 401) {
+        setAdminMsg('⚠️ Sessão de administrador expirada. Faça login novamente.');
+        setIsAdminAuthenticated(false);
+        setIsAuthModalOpen(true);
+      } else {
+        const errJson = await res.json().catch(() => null);
+        if (errJson?.error) setAdminMsg(`⚠️ ${errJson.error}`);
       }
     } catch (err) {
-      console.warn('Falha no upload para o servidor, usando base64:', err);
+      console.warn('Falha no upload para o servidor:', err);
     }
     return base64Data;
   };
 
-  // Salvar no estado, no localStorage e persistir no servidor (online para todos)
+  // Salvar no estado, no localStorage e persistir no servidor (apenas quando solicitado ou ao subir imagem)
   const persistData = async (updated: typeof D) => {
     setData(updated);
     try {
       localStorage.setItem(K, JSON.stringify(updated));
-    } catch {
-      // LocalStorage pode ter quota excedida, mas o servidor garantirá a persistência
+    } catch {}
+
+    const token = getAdminAuthToken();
+    if (!token) {
+      setSyncStatus('erro');
+      setAdminMsg('⚠️ Faça login como administrador para salvar no servidor.');
+      setIsAdminAuthenticated(false);
+      setIsAuthModalOpen(true);
+      return;
     }
 
     try {
       setSyncStatus('salvando');
       const res = await fetch('/api/store-data', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
         body: JSON.stringify(updated),
       });
       if (res.ok) {
         setSyncStatus('online');
+        setHasUnsavedChanges(false);
         const now = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
         setLastSavedTime(now);
         setAdminMsg(`✅ Salvo com sucesso no servidor às ${now}! Online para todos.`);
+      } else if (res.status === 401) {
+        setSyncStatus('erro');
+        setAdminMsg('⚠️ Sessão de administrador expirada. Faça login novamente.');
+        setIsAdminAuthenticated(false);
+        setIsAuthModalOpen(true);
       } else {
         setSyncStatus('erro');
-        setAdminMsg('⚠️ Salvo localmente, mas erro ao sincronizar com o servidor.');
+        setAdminMsg('⚠️ Erro ao salvar alterações no servidor.');
       }
     } catch (err) {
       setSyncStatus('erro');
       console.warn('Erro ao salvar no servidor:', err);
-      setAdminMsg('Salvo neste navegador.');
+      setAdminMsg('❌ Falha na conexão com o servidor.');
     }
   };
 
@@ -405,7 +452,7 @@ export const ClaudeWowPreview: React.FC<any> = () => {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isAdminAuthenticated]);
 
-  // Handlers do Painel
+  // Handlers do Painel (Salvam no estado local para não sobrecarregar o servidor a cada tecla)
   const handleUpdateField = (path: string, value: any) => {
     const next = clone(data);
     const keys = path.split('.');
@@ -416,14 +463,16 @@ export const ClaudeWowPreview: React.FC<any> = () => {
       target = target[k];
     }
     target[lastKey] = value;
-    persistData(next);
+    setData(next);
+    setHasUnsavedChanges(true);
   };
 
   const handleUpdateProduct = (index: number, field: string, value: any) => {
     const next = clone(data);
     if (next.produtos[index]) {
       (next.produtos[index] as any)[field] = value;
-      persistData(next);
+      setData(next);
+      setHasUnsavedChanges(true);
     }
   };
 
@@ -433,11 +482,13 @@ export const ClaudeWowPreview: React.FC<any> = () => {
     if (direction === 'up' && index > 0) {
       const item = list.splice(index, 1)[0];
       list.splice(index - 1, 0, item);
-      persistData(next);
+      setData(next);
+      setHasUnsavedChanges(true);
     } else if (direction === 'down' && index < list.length - 1) {
       const item = list.splice(index, 1)[0];
       list.splice(index + 1, 0, item);
-      persistData(next);
+      setData(next);
+      setHasUnsavedChanges(true);
     }
   };
 
@@ -445,7 +496,8 @@ export const ClaudeWowPreview: React.FC<any> = () => {
     if (confirmDeleteIdx === index) {
       const next = clone(data);
       next.produtos.splice(index, 1);
-      persistData(next);
+      setData(next);
+      setHasUnsavedChanges(true);
       setConfirmDeleteIdx(null);
     } else {
       setConfirmDeleteIdx(index);
@@ -469,7 +521,8 @@ export const ClaudeWowPreview: React.FC<any> = () => {
       art: { k: 'jar', body: '#8A4A1C', lab: '#FFF3CF', ink: '#8A4A1C' },
       r: 5,
     });
-    persistData(next);
+    setData(next);
+    setHasUnsavedChanges(true);
   };
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>, fieldKey: string, isProduct?: number) => {
@@ -503,14 +556,15 @@ export const ClaudeWowPreview: React.FC<any> = () => {
     const next = clone(data);
     if (!next.menu) {
       next.menu = [
-        { id: '1', title: 'Na Vitrini', url: '#produtos' },
+        { id: '1', title: 'Na Vitrine', url: '#produtos' },
         { id: '2', title: 'Sobre', url: '#sobre' },
         { id: '3', title: 'Onde comprar', url: '#onde' },
       ];
     }
     if (next.menu[index]) {
       next.menu[index][field] = value;
-      persistData(next);
+      setData(next);
+      setHasUnsavedChanges(true);
     }
   };
 
@@ -518,23 +572,25 @@ export const ClaudeWowPreview: React.FC<any> = () => {
     const next = clone(data);
     if (!next.menu) {
       next.menu = [
-        { id: '1', title: 'Na Vitrini', url: '#produtos' },
+        { id: '1', title: 'Na Vitrine', url: '#produtos' },
         { id: '2', title: 'Sobre', url: '#sobre' },
         { id: '3', title: 'Onde comprar', url: '#onde' },
       ];
     }
     const newId = String(Date.now());
     next.menu.push({ id: newId, title: 'Novo Item', url: '#produtos' });
-    persistData(next);
-    setAdminMsg('Novo item adicionado ao menu!');
+    setData(next);
+    setHasUnsavedChanges(true);
+    setAdminMsg('Novo item adicionado ao menu! Clique em Salvar para publicar.');
   };
 
   const handleRemoveMenuItem = (index: number) => {
     const next = clone(data);
     if (next.menu && next.menu[index]) {
       next.menu.splice(index, 1);
-      persistData(next);
-      setAdminMsg('Item de menu removido.');
+      setData(next);
+      setHasUnsavedChanges(true);
+      setAdminMsg('Item de menu removido. Clique em Salvar para publicar.');
     }
   };
 
@@ -542,16 +598,18 @@ export const ClaudeWowPreview: React.FC<any> = () => {
     const next = clone(data);
     if (!next.img) next.img = { logo: '', favicon: '' };
     next.img.logo = url;
-    persistData(next);
-    setAdminMsg('Logo salva com sucesso!');
+    setData(next);
+    setHasUnsavedChanges(true);
+    setAdminMsg('Logo atualizada. Clique em Salvar para confirmar no servidor.');
   };
 
   const handleRemoveLogo = () => {
     const next = clone(data);
     if (!next.img) next.img = { logo: '', favicon: '' };
     next.img.logo = '';
-    persistData(next);
-    setAdminMsg('Logo removida. A base de dados não exibirá mais a logo antiga.');
+    setData(next);
+    setHasUnsavedChanges(true);
+    setAdminMsg('Logo removida. Clique em Salvar para confirmar no servidor.');
   };
 
   const handleCopyConfig = () => {
@@ -657,7 +715,7 @@ export const ClaudeWowPreview: React.FC<any> = () => {
             {(data.menu && data.menu.length > 0
               ? data.menu
               : [
-                  { id: '1', title: 'Na Vitrini', url: '#produtos' },
+                  { id: '1', title: 'Na Vitrine', url: '#produtos' },
                   { id: '2', title: 'Sobre', url: '#sobre' },
                   { id: '3', title: 'Onde comprar', url: '#onde' },
                 ]
@@ -700,7 +758,7 @@ export const ClaudeWowPreview: React.FC<any> = () => {
           {(data.menu && data.menu.length > 0
             ? data.menu
             : [
-                { id: '1', title: 'Na Vitrini', url: '#produtos' },
+                { id: '1', title: 'Na Vitrine', url: '#produtos' },
                 { id: '2', title: 'Sobre', url: '#sobre' },
                 { id: '3', title: 'Onde comprar', url: '#onde' },
               ]
@@ -720,7 +778,7 @@ export const ClaudeWowPreview: React.FC<any> = () => {
               {(data.menu && data.menu.length > 0
                 ? data.menu
                 : [
-                    { id: '1', title: 'Na Vitrini', url: '#produtos' },
+                    { id: '1', title: 'Na Vitrine', url: '#produtos' },
                     { id: '2', title: 'Sobre', url: '#sobre' },
                     { id: '3', title: 'Onde comprar', url: '#onde' },
                   ]
@@ -1164,8 +1222,25 @@ export const ClaudeWowPreview: React.FC<any> = () => {
               </span>
             </div>
             <p style={{ margin: 0, fontSize: '13px', opacity: 0.9, lineHeight: 1.4 }}>
-              As fotos enviadas e alterações são salvas automaticamente no servidor e ficam <b>visíveis online para todos os visitantes</b> em tempo real.
+              As fotos enviadas e alterações são salvas com segurança no servidor e ficam <b>visíveis online para todos os visitantes</b>.
             </p>
+
+            {hasUnsavedChanges && (
+              <div style={{
+                background: 'rgba(255, 201, 60, 0.15)',
+                border: '1px solid rgba(255, 201, 60, 0.4)',
+                borderRadius: '8px',
+                padding: '8px 12px',
+                fontSize: '12px',
+                color: '#FFC93C',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                fontWeight: 600,
+              }}>
+                <span>⚠️ Você possui alterações não salvas. Clique abaixo para salvar no servidor.</span>
+              </div>
+            )}
 
             <button
               type="button"
@@ -1186,13 +1261,15 @@ export const ClaudeWowPreview: React.FC<any> = () => {
                 gap: '8px',
                 border: 'none',
                 cursor: syncStatus === 'salvando' ? 'not-allowed' : 'pointer',
-                boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
+                boxShadow: hasUnsavedChanges ? '0 0 16px rgba(255,201,60,0.5)' : '0 4px 12px rgba(0,0,0,0.2)',
                 opacity: syncStatus === 'salvando' ? 0.7 : 1,
                 transition: 'all 0.2s',
               }}
             >
               {syncStatus === 'salvando' ? (
                 <span>Salvando no Servidor...</span>
+              ) : hasUnsavedChanges ? (
+                <span>💾 Salvar Alterações Pendentes</span>
               ) : (
                 <span>💾 Salvar Alterações no Servidor</span>
               )}
@@ -1326,7 +1403,7 @@ export const ClaudeWowPreview: React.FC<any> = () => {
             {(data.menu && data.menu.length > 0
               ? data.menu
               : [
-                  { id: '1', title: 'Na Vitrini', url: '#produtos' },
+                  { id: '1', title: 'Na Vitrine', url: '#produtos' },
                   { id: '2', title: 'Sobre', url: '#sobre' },
                   { id: '3', title: 'Onde comprar', url: '#onde' },
                 ]
@@ -1369,7 +1446,7 @@ export const ClaudeWowPreview: React.FC<any> = () => {
                   Título do Menu (como aparece no cabeçalho)
                   <input
                     type="text"
-                    placeholder="Ex: Na Vitrini, Nossos Produtos, Ofertas..."
+                    placeholder="Ex: Na Vitrine, Nossos Produtos, Ofertas..."
                     value={mItem.title}
                     onChange={(e) => handleUpdateMenuItem(mIdx, 'title', e.target.value)}
                     style={{ marginTop: '4px' }}

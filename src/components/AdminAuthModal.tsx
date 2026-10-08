@@ -82,6 +82,7 @@ export const AdminAuthModal: React.FC<AdminAuthModalProps> = ({
 
       if (res.ok && data.success) {
         const sessionPayload = JSON.stringify({
+          token: data.token,
           user: data.user?.username || cleanUser,
           name: data.user?.name,
           loggedAt: Date.now(),
@@ -103,25 +104,7 @@ export const AdminAuthModal: React.FC<AdminAuthModalProps> = ({
 
       setErrorMsg(data.message || 'Usuário ou senha incorretos.');
     } catch {
-      // Fallback local se o servidor estiver temporariamente inacessível
-      if (
-        (cleanUser === 'admin' && cleanPass === 'tomati2026') ||
-        (cleanUser === 'admin' && cleanPass === 'admin')
-      ) {
-        const sessionPayload = JSON.stringify({ user: cleanUser, loggedAt: Date.now() });
-        if (rememberMe) {
-          localStorage.setItem(AUTH_TOKEN_KEY, sessionPayload);
-        } else {
-          sessionStorage.setItem(AUTH_TOKEN_KEY, sessionPayload);
-        }
-        setSuccessMsg('Autenticado com sucesso!');
-        setTimeout(() => {
-          setIsLoading(false);
-          onLoginSuccess();
-        }, 350);
-        return;
-      }
-      setErrorMsg('Usuário ou senha incorretos.');
+      setErrorMsg('Não foi possível conectar ao servidor. Verifique sua conexão.');
     } finally {
       setIsLoading(false);
     }
@@ -141,8 +124,8 @@ export const AdminAuthModal: React.FC<AdminAuthModalProps> = ({
       return;
     }
 
-    if (cleanPass.length < 4) {
-      setErrorMsg('A senha deve ter pelo menos 4 caracteres.');
+    if (cleanPass.length < 6) {
+      setErrorMsg('A senha deve ter pelo menos 6 caracteres.');
       return;
     }
 
@@ -153,33 +136,43 @@ export const AdminAuthModal: React.FC<AdminAuthModalProps> = ({
 
     setIsLoading(true);
     try {
+      // Obter token de sessão ativa (apenas admins logados podem criar outros admins)
+      let activeToken = '';
+      try {
+        const raw = localStorage.getItem(AUTH_TOKEN_KEY) || sessionStorage.getItem(AUTH_TOKEN_KEY);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          activeToken = parsed.token || '';
+        }
+      } catch {}
+
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (activeToken) {
+        headers['Authorization'] = `Bearer ${activeToken}`;
+      }
+
       const res = await fetch('/api/admin/register', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({ username: cleanUser, password: cleanPass, name: cleanName }),
       });
 
       const data = await res.json();
 
       if (res.ok && data.success) {
-        const sessionPayload = JSON.stringify({
-          user: cleanUser,
-          name: cleanName,
-          loggedAt: Date.now(),
-        });
-        localStorage.setItem(AUTH_TOKEN_KEY, sessionPayload);
-
-        setSuccessMsg('Administrador cadastrado com sucesso! Acessando...');
+        setSuccessMsg('Novo administrador cadastrado com sucesso! Agora você pode fazer login.');
         setTimeout(() => {
           setIsLoading(false);
-          onLoginSuccess();
-        }, 400);
+          setTab('login');
+          setLoginUser(cleanUser);
+          setLoginPass('');
+        }, 1200);
         return;
       }
 
-      setErrorMsg(data.message || 'Erro ao cadastrar administrador.');
+      setErrorMsg(data.message || data.error || 'Apenas administradores autenticados podem cadastrar novos usuários.');
     } catch {
-      setErrorMsg('Não foi possível conectar ao servidor para cadastro.');
+      setErrorMsg('Erro ao conectar ao servidor.');
     } finally {
       setIsLoading(false);
     }
