@@ -114,8 +114,8 @@ function requireAuth(req: express.Request, res: express.Response, next: express.
 // Dados iniciais limpos e oficiais da Tomati
 const DEFAULT_STORE_DATA = {
   links: {
-    portal: 'https://pedido.tomati.com.br',
-    ifood: 'https://www.ifood.com.br/delivery/curitiba-pr/tomati-saudabilidade',
+    portal: 'https://loja.tomatibrasil.com.br/tomati',
+    ifood: 'https://www.ifood.com.br/delivery/curitiba-pr/tomati-alto-da-xv/4f3220a4-83f6-46b2-87ef-8279d71c4901',
     instagram: 'https://instagram.com/tomatibrasil',
     tiktok: 'https://tiktok.com/@tomatibrasil',
   },
@@ -124,17 +124,17 @@ const DEFAULT_STORE_DATA = {
     tiktok: '@tomatibrasil',
   },
   img: {
-    logo: '',
-    favicon: '',
+    logo: '/uploads/brand-logo-1791487284490-4c8cc840fb27055f.png',
+    favicon: '/uploads/brand-favicon-1791487298420-3e2e18722687098a.png',
   },
   menu: [
-    { id: '1', title: 'Na Vitrine', url: '#produtos' },
-    { id: '2', title: 'Sobre', url: '#sobre' },
-    { id: '3', title: 'Onde encontrar', url: '#onde' },
+    { id: '1', title: 'na vitrine', url: '#produtos' },
+    { id: '2', title: 'sobre', url: '#sobre' },
+    { id: '3', title: 'onde encontrar', url: '#onde' },
   ],
   regiao: 'Curitiba e Região',
-  horario: '',
-  contato: '',
+  horario: 'Segunda a Sexta 09hs as 21hs. Sábado e Domingo 16hs as 21hs.',
+  contato: '4199144-9050 oi@tomatibrasil.com.br',
   t: {
     hero_h: 'Comida que faz bem, a dois toques.',
     hero_p: 'Marcas de alimentação saudável que a gente seleciona, num só lugar. Escolha o canal e peça.',
@@ -147,13 +147,13 @@ const DEFAULT_STORE_DATA = {
     {
       nome: 'Hey! Mu',
       texto: 'Doce de leite zero açúcar.',
-      price: '',
+      price: '29,90',
       link: 'portal',
       cta: 'Quero experimentar',
       bg: '#FFC93C',
       c: '#14201A',
       nivel: 3,
-      img: '',
+      img: '/uploads/prod-0-1791487429247-7d7abddb3e541f76.webp',
       art: { k: 'jar', body: '#8A4A1C', lab: '#FFF3CF', ink: '#8A4A1C' },
       r: 6,
     },
@@ -166,7 +166,7 @@ const DEFAULT_STORE_DATA = {
       bg: '#1F5A3F',
       c: '#ffffff',
       nivel: 1,
-      img: '',
+      img: '/uploads/prod-1-1791487449958-5a425616d53b9020.webp',
       art: { k: 'carton', body: '#F4F0E4', lab: '#1F5A3F', ink: '#1F5A3F' },
       r: -5,
     },
@@ -192,7 +192,7 @@ const DEFAULT_STORE_DATA = {
       bg: '#E63B1F',
       c: '#ffffff',
       nivel: 2,
-      img: '',
+      img: '/uploads/prod-3-1791487489811-86dc0248b2ad0237.webp',
       art: { k: 'box', body: '#FFF3CF', lab: '#E63B1F', ink: '#E63B1F' },
       r: -6,
     },
@@ -205,7 +205,7 @@ const DEFAULT_STORE_DATA = {
       bg: '#3E2112',
       c: '#FFE9CF',
       nivel: 2,
-      img: '',
+      img: '/uploads/prod-4-1791487499648-99ee1a843e164e7d.webp',
       art: { k: 'pouch', body: '#6B3A22', lab: '#FFE9CF', ink: '#3E2112' },
       r: 4,
     },
@@ -410,6 +410,20 @@ app.post('/api/store-data', requireAuth, (req, res) => {
 
     const normalized = normalizeStoreData(payload);
     atomicWriteJsonSync(STORE_DATA_FILE, normalized);
+
+    // Espelha para public/store-data.json e dist/store-data.json para sincronização estática e hosts como Vercel
+    const publicStoreData = path.join(__dirname, 'public', 'store-data.json');
+    try {
+      atomicWriteJsonSync(publicStoreData, normalized);
+    } catch {}
+
+    const distStoreData = path.join(__dirname, 'dist', 'store-data.json');
+    if (fs.existsSync(path.join(__dirname, 'dist'))) {
+      try {
+        atomicWriteJsonSync(distStoreData, normalized);
+      } catch {}
+    }
+
     const user = (req as any).adminUser?.username || 'admin';
     console.log(`[Tomati Server] store-data.json atualizado por ${user}. ${normalized.produtos.length} produtos.`);
     return res.json({ success: true, timestamp: Date.now() });

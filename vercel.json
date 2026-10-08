@@ -1,6 +1,10 @@
 {
   "rewrites": [
     {
+      "source": "/api/store-data",
+      "destination": "/store-data.json"
+    },
+    {
       "source": "/(.*)",
       "destination": "/"
     }

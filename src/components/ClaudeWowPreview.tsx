@@ -4,11 +4,11 @@ import { AdminAuthModal } from './AdminAuthModal';
 import { PWAInstallModal } from './PWAInstallModal';
 import { Smartphone } from 'lucide-react';
 
-// Configuração padrão idêntica ao código da Tomati
+// Configuração padrão com os dados e imagens oficiais salvos da Tomati
 const D = {
   links: {
-    portal: 'https://pedido.tomati.com.br',
-    ifood: 'https://www.ifood.com.br/delivery/curitiba-pr/tomati-saudabilidade',
+    portal: 'https://loja.tomatibrasil.com.br/tomati',
+    ifood: 'https://www.ifood.com.br/delivery/curitiba-pr/tomati-alto-da-xv/4f3220a4-83f6-46b2-87ef-8279d71c4901',
     instagram: 'https://instagram.com/tomatibrasil',
     tiktok: 'https://tiktok.com/@tomatibrasil',
   },
@@ -17,17 +17,17 @@ const D = {
     tiktok: '@tomatibrasil',
   },
   img: {
-    logo: '',
-    favicon: '',
+    logo: '/uploads/brand-logo-1791487284490-4c8cc840fb27055f.png',
+    favicon: '/uploads/brand-favicon-1791487298420-3e2e18722687098a.png',
   },
   menu: [
-    { id: '1', title: 'Na Vitrine', url: '#produtos' },
-    { id: '2', title: 'Sobre', url: '#sobre' },
-    { id: '3', title: 'Onde encontrar', url: '#onde' },
+    { id: '1', title: 'na vitrine', url: '#produtos' },
+    { id: '2', title: 'sobre', url: '#sobre' },
+    { id: '3', title: 'onde encontrar', url: '#onde' },
   ],
   regiao: 'Curitiba e Região',
-  horario: '',
-  contato: '',
+  horario: 'Segunda a Sexta 09hs as 21hs. Sábado e Domingo 16hs as 21hs.',
+  contato: '4199144-9050 oi@tomatibrasil.com.br',
   t: {
     hero_h: 'Comida que faz bem, a dois toques.',
     hero_p: 'Marcas de alimentação saudável que a gente seleciona, num só lugar. Escolha o canal e peça.',
@@ -40,13 +40,13 @@ const D = {
     {
       nome: 'Hey! Mu',
       texto: 'Doce de leite zero açúcar.',
-      price: '',
+      price: '29,90',
       link: 'portal',
       cta: 'Quero experimentar',
       bg: '#FFC93C',
       c: '#14201A',
       nivel: 3,
-      img: '',
+      img: '/uploads/prod-0-1791487429247-7d7abddb3e541f76.webp',
       art: { k: 'jar', body: '#8A4A1C', lab: '#FFF3CF', ink: '#8A4A1C' },
       r: 6,
     },
@@ -59,7 +59,7 @@ const D = {
       bg: '#1F5A3F',
       c: '#ffffff',
       nivel: 1,
-      img: '',
+      img: '/uploads/prod-1-1791487449958-5a425616d53b9020.webp',
       art: { k: 'carton', body: '#F4F0E4', lab: '#1F5A3F', ink: '#1F5A3F' },
       r: -5,
     },
@@ -85,7 +85,7 @@ const D = {
       bg: '#E63B1F',
       c: '#ffffff',
       nivel: 2,
-      img: '',
+      img: '/uploads/prod-3-1791487489811-86dc0248b2ad0237.webp',
       art: { k: 'box', body: '#FFF3CF', lab: '#E63B1F', ink: '#E63B1F' },
       r: -6,
     },
@@ -98,7 +98,7 @@ const D = {
       bg: '#3E2112',
       c: '#FFE9CF',
       nivel: 2,
-      img: '',
+      img: '/uploads/prod-4-1791487499648-99ee1a843e164e7d.webp',
       art: { k: 'pouch', body: '#6B3A22', lab: '#FFE9CF', ink: '#3E2112' },
       r: 4,
     },
@@ -382,31 +382,57 @@ export const ClaudeWowPreview: React.FC<any> = () => {
     setAdminMsg('Sessão de administrador finalizada.');
   };
 
-  // Carregar dados salvos no servidor (para aparecer online para todos os visitantes)
+  // Carregar dados salvos no servidor (ou fallback estático /store-data.json para Vercel / GitHub Pages)
   useEffect(() => {
     let isMounted = true;
-    fetch('/api/store-data')
-      .then((res) => {
-        if (!res.ok) throw new Error('Status ' + res.status);
-        return res.json();
-      })
-      .then((serverData) => {
-        if (!isMounted) return;
-        if (serverData && serverData.produtos && Array.isArray(serverData.produtos)) {
-          setData(serverData);
-          setSyncStatus('online');
-          try {
-            localStorage.setItem(K, JSON.stringify(serverData));
-          } catch {}
-        } else {
-          setSyncStatus('online');
+
+    const loadData = async () => {
+      // 1. Tenta carregar do endpoint de API do Node/Express
+      try {
+        const res = await fetch('/api/store-data');
+        if (res.ok) {
+          const contentType = res.headers.get('content-type') || '';
+          if (contentType.includes('application/json')) {
+            const serverData = await res.json();
+            if (serverData && Array.isArray(serverData.produtos)) {
+              if (!isMounted) return;
+              setData(serverData);
+              setSyncStatus('online');
+              try { localStorage.setItem(K, JSON.stringify(serverData)); } catch {}
+              return;
+            }
+          }
         }
-      })
-      .catch((err) => {
-        if (!isMounted) return;
-        console.info('[Tomati] Servidor inacessível, mantendo cache local:', err);
-        setSyncStatus('erro');
-      });
+      } catch (err) {
+        // Fallback para arquivo estático
+      }
+
+      // 2. Se a API não respondeu ou retornou HTML (ex: Vercel sem servidor Node), tenta o arquivo estático
+      try {
+        const staticRes = await fetch('/store-data.json');
+        if (staticRes.ok) {
+          const contentType = staticRes.headers.get('content-type') || '';
+          if (contentType.includes('application/json')) {
+            const staticData = await staticRes.json();
+            if (staticData && Array.isArray(staticData.produtos)) {
+              if (!isMounted) return;
+              setData(staticData);
+              setSyncStatus('online');
+              try { localStorage.setItem(K, JSON.stringify(staticData)); } catch {}
+              return;
+            }
+          }
+        }
+      } catch (err) {
+        // Ignora
+      }
+
+      if (isMounted) {
+        setSyncStatus('online');
+      }
+    };
+
+    loadData();
 
     return () => {
       isMounted = false;

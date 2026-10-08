@@ -8,3 +8,6 @@ coverage/
 !.env.example
 data/admin-users*.json
 data/*.backup.json
+!data/store-data.json
+!public/store-data.json
+!public/uploads/
