@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { TomatiLogo } from './TomatiLogo';
 import { AdminAuthModal } from './AdminAuthModal';
 import { PWAInstallModal } from './PWAInstallModal';
-import { Menu, X, Smartphone, Download, MapPin, Clock, Phone, ShoppingBag, ArrowRight } from 'lucide-react';
+import { Smartphone } from 'lucide-react';
 
 // Configuração padrão idêntica ao código da Tomati
 const D = {
@@ -23,7 +23,7 @@ const D = {
   menu: [
     { id: '1', title: 'Na Vitrine', url: '#produtos' },
     { id: '2', title: 'Sobre', url: '#sobre' },
-    { id: '3', title: 'Onde comprar', url: '#onde' },
+    { id: '3', title: 'Onde encontrar', url: '#onde' },
   ],
   regiao: 'Curitiba e Região',
   horario: '',
@@ -294,7 +294,6 @@ export const ClaudeWowPreview: React.FC<any> = () => {
   });
   const [confirmDeleteIdx, setConfirmDeleteIdx] = useState<number | null>(null);
   const [confirmReset, setConfirmReset] = useState(false);
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isPWAInstallModalOpen, setIsPWAInstallModalOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -634,7 +633,7 @@ export const ClaudeWowPreview: React.FC<any> = () => {
       next.menu = [
         { id: '1', title: 'Na Vitrine', url: '#produtos' },
         { id: '2', title: 'Sobre', url: '#sobre' },
-        { id: '3', title: 'Onde comprar', url: '#onde' },
+        { id: '3', title: 'Onde encontrar', url: '#onde' },
       ];
     }
     if (next.menu[index]) {
@@ -650,7 +649,7 @@ export const ClaudeWowPreview: React.FC<any> = () => {
       next.menu = [
         { id: '1', title: 'Na Vitrine', url: '#produtos' },
         { id: '2', title: 'Sobre', url: '#sobre' },
-        { id: '3', title: 'Onde comprar', url: '#onde' },
+        { id: '3', title: 'Onde encontrar', url: '#onde' },
       ];
     }
     const newId = String(Date.now());
@@ -875,7 +874,7 @@ export const ClaudeWowPreview: React.FC<any> = () => {
               : [
                   { id: '1', title: 'Na Vitrine', url: '#produtos' },
                   { id: '2', title: 'Sobre', url: '#sobre' },
-                  { id: '3', title: 'Onde comprar', url: '#onde' },
+                  { id: '3', title: 'Onde encontrar', url: '#onde' },
                 ]
             ).map((mItem: any) => (
               <a key={mItem.id || mItem.url} href={mItem.url}>
@@ -897,147 +896,37 @@ export const ClaudeWowPreview: React.FC<any> = () => {
           <div className="flex items-center gap-2">
             {/* Botão de Pedido */}
             <a className="btn b-white shrink-0" href="#onde">Fazer pedido</a>
-
-            {/* Botão Menu Hambúrguer (Mobile / iOS) */}
-            <button
-              type="button"
-              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-              className="inline-flex md:hidden items-center justify-center w-9 h-9 rounded-xl bg-white/10 hover:bg-white/20 text-white transition-all cursor-pointer border border-white/15 shrink-0"
-              aria-label={isMobileMenuOpen ? "Fechar menu" : "Abrir menu"}
-              title="Menu de informações e navegação"
-            >
-              {isMobileMenuOpen ? <X size={19} /> : <Menu size={19} />}
-            </button>
           </div>
         </div>
 
-        {/* Sub-barra de Navegação Rápida no Mobile (Garante visibilidade total no iOS e Android sem encavalar) */}
+        {/* Sub-barra de Navegação Rápida no Mobile com Redes Sociais */}
         <nav className="nav-sub-mobile" aria-label="Navegação rápida">
-          {(data.menu && data.menu.length > 0
-            ? data.menu
-            : [
-                { id: '1', title: 'Na Vitrine', url: '#produtos' },
-                { id: '2', title: 'Sobre', url: '#sobre' },
-                { id: '3', title: 'Onde comprar', url: '#onde' },
-              ]
-          ).map((mItem: any, idx: number, arr: any[]) => (
-            <React.Fragment key={mItem.id || mItem.url || idx}>
-              <a href={mItem.url}>{mItem.title}</a>
-              {idx < arr.length - 1 && <span className="dot-sep">·</span>}
-            </React.Fragment>
-          ))}
-        </nav>
-
-        {/* Menu Mobile / Drawer Desdobrável no Padrão Oficial (iOS & Android) */}
-        {isMobileMenuOpen && (
-          <div className="md:hidden bg-[#14201A] border-t border-white/15 px-4 py-4 animate-in slide-in-from-top-2 duration-200 text-white space-y-4 shadow-2xl">
-            {/* Links Rápidos com ícones */}
-            <div className={`grid gap-2 ${(data.menu || []).length > 3 ? 'grid-cols-2' : 'grid-cols-3'}`}>
-              {(data.menu && data.menu.length > 0
-                ? data.menu
-                : [
-                    { id: '1', title: 'Na Vitrine', url: '#produtos' },
-                    { id: '2', title: 'Sobre', url: '#sobre' },
-                    { id: '3', title: 'Onde comprar', url: '#onde' },
-                  ]
-              ).map((mItem: any, idx: number) => {
-                const icons = [
-                  <ShoppingBag size={18} className="text-[#FFC93C] mb-1" />,
-                  <span className="text-base mb-0.5">🌿</span>,
-                  <span className="text-base mb-0.5">🛵</span>,
-                ];
-                return (
-                  <a
-                    key={mItem.id || idx}
-                    href={mItem.url}
-                    onClick={() => setIsMobileMenuOpen(false)}
-                    className="flex flex-col items-center justify-center p-2.5 rounded-2xl bg-white/5 hover:bg-white/10 border border-white/10 text-center transition-colors"
-                  >
-                    {icons[idx % icons.length]}
-                    <span className="text-xs font-bold">{mItem.title}</span>
-                  </a>
-                );
-              })}
-            </div>
-
-            {/* Ações de Pedido Direto */}
-            <div className="flex gap-2">
-              <a
-                href={getUrl('portal')}
-                target="_blank"
-                rel="noopener noreferrer"
-                onClick={() => setIsMobileMenuOpen(false)}
-                className="flex-1 py-2.5 px-3 rounded-xl bg-[#E63B1F] hover:bg-[#d43319] text-white font-bold text-xs text-center shadow-md flex items-center justify-center gap-1.5"
-              >
-                <span>Portal Tomati</span>
-                <ArrowRight size={13} />
-              </a>
-
-              <a
-                href={getUrl('ifood')}
-                target="_blank"
-                rel="noopener noreferrer"
-                onClick={() => setIsMobileMenuOpen(false)}
-                className="flex-1 py-2.5 px-3 rounded-xl bg-[#EA1D2C] hover:bg-[#c91825] text-white font-bold text-xs text-center shadow-md flex items-center justify-center gap-1.5"
-              >
-                <span>Pedir no iFood</span>
-                <ArrowRight size={13} />
-              </a>
-            </div>
-
-            {/* Informações da Loja (Resolve a queixa do iOS onde faltavam informações) */}
-            <div className="p-3.5 rounded-2xl bg-white/5 border border-white/10 space-y-2 text-xs">
-              <div className="flex items-start gap-2.5 text-white/90">
-                <MapPin size={15} className="text-[#FFC93C] shrink-0 mt-0.5" />
-                <span><strong>Região:</strong> {data.regiao}</span>
-              </div>
-              <div className="flex items-start gap-2.5 text-white/80">
-                <Clock size={15} className="text-[#FFC93C] shrink-0 mt-0.5" />
-                <span className="text-[11px] leading-tight">{data.horario}</span>
-              </div>
-              <div className="flex items-start gap-2.5 text-white/80">
-                <Phone size={15} className="text-[#FFC93C] shrink-0 mt-0.5" />
-                <span className="text-[11px] leading-tight">{data.contato}</span>
-              </div>
-            </div>
-
-            {/* Redes Sociais & Instalar App */}
-            <div className="flex items-center justify-between pt-1">
-              <div className="flex items-center gap-3">
-                <a
-                  href={getUrl('instagram')}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-1.5 text-xs text-white/80 hover:text-white"
-                >
-                  <svg viewBox="0 0 24 24" className="w-4 h-4 fill-white"><use href="#ig" /></svg>
-                  <span className="text-[11px] font-mono">{data.handles.instagram}</span>
-                </a>
-                <a
-                  href={getUrl('tiktok')}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-1.5 text-xs text-white/80 hover:text-white"
-                >
-                  <svg viewBox="0 0 24 24" className="w-4 h-4 fill-white"><use href="#tt" /></svg>
-                  <span className="text-[11px] font-mono">{data.handles.tiktok}</span>
-                </a>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => {
-                  setIsMobileMenuOpen(false);
-                  setIsPWAInstallModalOpen(true);
-                }}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#FFC93C] text-[#14201A] font-bold text-xs shadow-xs cursor-pointer active:scale-95"
-              >
-                <Download size={13} />
-                <span>Instalar App</span>
-              </button>
-            </div>
+          <div className="nav-sub-links">
+            {(data.menu && data.menu.length > 0
+              ? data.menu
+              : [
+                  { id: '1', title: 'Na Vitrine', url: '#produtos' },
+                  { id: '2', title: 'Sobre', url: '#sobre' },
+                  { id: '3', title: 'Onde encontrar', url: '#onde' },
+                ]
+            ).map((mItem: any, idx: number, arr: any[]) => (
+              <React.Fragment key={mItem.id || mItem.url || idx}>
+                <a href={mItem.url}>{mItem.title}</a>
+                {idx < arr.length - 1 && <span className="dot-sep">·</span>}
+              </React.Fragment>
+            ))}
           </div>
-        )}
+
+          {/* Redes Sociais no Mobile Integradas na Barra */}
+          <div className="nav-sub-soc">
+            <a href={getUrl('instagram')} aria-label="Instagram" target="_blank" rel="noopener noreferrer">
+              <svg viewBox="0 0 24 24"><use href="#ig" /></svg>
+            </a>
+            <a href={getUrl('tiktok')} aria-label="TikTok" target="_blank" rel="noopener noreferrer">
+              <svg viewBox="0 0 24 24"><use href="#tt" /></svg>
+            </a>
+          </div>
+        </nav>
       </header>
 
       <main id="top">
@@ -1563,7 +1452,7 @@ export const ClaudeWowPreview: React.FC<any> = () => {
               : [
                   { id: '1', title: 'Na Vitrine', url: '#produtos' },
                   { id: '2', title: 'Sobre', url: '#sobre' },
-                  { id: '3', title: 'Onde comprar', url: '#onde' },
+                  { id: '3', title: 'Onde encontrar', url: '#onde' },
                 ]
             ).map((mItem: any, mIdx: number) => (
               <div

@@ -130,7 +130,7 @@ const DEFAULT_STORE_DATA = {
   menu: [
     { id: '1', title: 'Na Vitrine', url: '#produtos' },
     { id: '2', title: 'Sobre', url: '#sobre' },
-    { id: '3', title: 'Onde comprar', url: '#onde' },
+    { id: '3', title: 'Onde encontrar', url: '#onde' },
   ],
   regiao: 'Curitiba e Região',
   horario: '',
