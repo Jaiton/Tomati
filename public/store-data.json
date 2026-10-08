@@ -26,7 +26,7 @@
     },
     {
       "id": "3",
-      "title": "onde pedir",
+      "title": "pedir",
       "url": "#onde"
     }
   ],
@@ -87,7 +87,7 @@
       "bg": "#D9A066",
       "c": "#14201A",
       "nivel": 1,
-      "img": "",
+      "img": "/uploads/prod-2-1791489729222-e1e477df9b7369a1.webp",
       "art": {
         "k": "jar",
         "body": "#B5651D",
@@ -133,7 +133,7 @@
       "r": 4
     },
     {
-      "nome": "Sua campanha aqui",
+      "nome": "Momentos inesquecíveis!",
       "texto": "Combine marcas saudáveis e snacks num só pedido em Curitiba.",
       "price": "",
       "link": "portal",

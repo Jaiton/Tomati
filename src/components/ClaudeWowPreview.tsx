@@ -20,11 +20,12 @@ const D = {
   img: {
     logo: DEFAULT_LOGO_BASE64,
     favicon: '/uploads/brand-favicon-1791487298420-3e2e18722687098a.png',
+    hero_banner: '',
   },
   menu: [
     { id: '1', title: 'na vitrine', url: '#produtos' },
     { id: '2', title: 'sobre', url: '#sobre' },
-    { id: '3', title: 'onde pedir', url: '#onde' },
+    { id: '3', title: 'pedir', url: '#onde' },
   ],
   regiao: 'Curitiba e Região',
   horario: 'Segunda a Sexta 09hs as 21hs. Sábado e Domingo 16hs as 21hs.',
@@ -104,7 +105,7 @@ const D = {
       r: 4,
     },
     {
-      nome: 'Sua campanha aqui',
+      nome: 'Momentos inesquecíveis!',
       texto: 'Combine marcas saudáveis e snacks num só pedido em Curitiba.',
       price: '',
       link: 'portal',
@@ -122,6 +123,21 @@ const D = {
 const K = 'tomati_site_v1';
 const clone = <T,>(o: T): T => JSON.parse(JSON.stringify(o));
 const CL: Record<number, string> = { 4: 's6', 3: 's4', 2: 's3', 1: 's2' };
+
+// Helper para resolução resiliente de URLs de imagem (funciona em raiz, subdomínios, GitHub Pages e Vercel)
+function resolveImageUrl(url?: string): string {
+  if (!url) return '';
+  if (url.startsWith('data:') || url.startsWith('http://') || url.startsWith('https://')) {
+    return url;
+  }
+  const cleanPath = url.startsWith('/') ? url : `/${url}`;
+  const base = (import.meta as any).env?.BASE_URL || '/';
+  if (base && base !== '/' && base !== './') {
+    const cleanBase = base.endsWith('/') ? base.slice(0, -1) : base;
+    return `${cleanBase}${cleanPath}`;
+  }
+  return cleanPath;
+}
 
 // Gerador de ilustrações vetoriais idêntico ao código do Claude
 function renderArt(artObj: any, nome: string) {
@@ -272,7 +288,16 @@ export const ClaudeWowPreview: React.FC<any> = () => {
     try {
       const saved = localStorage.getItem(K);
       if (saved) {
-        return { ...clone(D), ...JSON.parse(saved) };
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed.menu)) {
+          parsed.menu = parsed.menu.map((m: any) => {
+            if (m?.title && (m.title.toLowerCase() === 'onde encontrar' || m.title.toLowerCase() === 'onde pedir')) {
+              return { ...m, title: 'pedir' };
+            }
+            return m;
+          });
+        }
+        return { ...clone(D), ...parsed };
       }
     } catch {
       // Ignore
@@ -297,6 +322,7 @@ export const ClaudeWowPreview: React.FC<any> = () => {
   const [confirmReset, setConfirmReset] = useState(false);
   const [isPWAInstallModalOpen, setIsPWAInstallModalOpen] = useState(false);
   const [failedImages, setFailedImages] = useState<Record<string, boolean>>({});
+  const [logoError, setLogoError] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Estados de Gerenciamento de Administradores e Troca de Senha
@@ -384,6 +410,18 @@ export const ClaudeWowPreview: React.FC<any> = () => {
     setAdminMsg('Sessão de administrador finalizada.');
   };
 
+  // Helper para normalizar itens do menu e evitar sobreposição de textos longos
+  const cleanMenuData = (inputData: any) => {
+    if (!inputData || !Array.isArray(inputData.menu)) return inputData;
+    const updatedMenu = inputData.menu.map((m: any) => {
+      if (m?.title && (m.title.toLowerCase() === 'onde encontrar' || m.title.toLowerCase() === 'onde pedir')) {
+        return { ...m, title: 'pedir' };
+      }
+      return m;
+    });
+    return { ...inputData, menu: updatedMenu };
+  };
+
   // Carregar dados salvos no servidor (ou fallback estático /store-data.json para Vercel / GitHub Pages)
   useEffect(() => {
     let isMounted = true;
@@ -398,9 +436,10 @@ export const ClaudeWowPreview: React.FC<any> = () => {
             const serverData = await res.json();
             if (serverData && Array.isArray(serverData.produtos)) {
               if (!isMounted) return;
-              setData(serverData);
+              const cleaned = cleanMenuData(serverData);
+              setData(cleaned);
               setSyncStatus('online');
-              try { localStorage.setItem(K, JSON.stringify(serverData)); } catch {}
+              try { localStorage.setItem(K, JSON.stringify(cleaned)); } catch {}
               return;
             }
           }
@@ -418,9 +457,10 @@ export const ClaudeWowPreview: React.FC<any> = () => {
             const staticData = await staticRes.json();
             if (staticData && Array.isArray(staticData.produtos)) {
               if (!isMounted) return;
-              setData(staticData);
+              const cleaned = cleanMenuData(staticData);
+              setData(cleaned);
               setSyncStatus('online');
-              try { localStorage.setItem(K, JSON.stringify(staticData)); } catch {}
+              try { localStorage.setItem(K, JSON.stringify(cleaned)); } catch {}
               return;
             }
           }
@@ -638,16 +678,17 @@ export const ClaudeWowPreview: React.FC<any> = () => {
         }
       });
     } else {
-      const maxW = fieldKey === 'logo' ? 600 : 128;
-      compressImage(file, maxW, 'image/png', async (base64) => {
+      const maxW = fieldKey === 'logo' ? 600 : fieldKey === 'hero_banner' ? 1600 : 128;
+      const mime = fieldKey === 'hero_banner' ? 'image/webp' : 'image/png';
+      compressImage(file, maxW, mime, async (base64) => {
         const serverUrl = await uploadImageToServer(base64, `brand-${fieldKey}`);
         const current = dataRef.current || data;
         const next = clone(current);
-        if (!next.img) next.img = { logo: '', favicon: '' };
+        if (!next.img) next.img = { logo: '', favicon: '', hero_banner: '' };
         (next.img as any)[fieldKey] = serverUrl;
         const ok = await persistData(next);
         if (ok) {
-          setAdminMsg('Imagem da marca salva e publicada com sucesso!');
+          setAdminMsg('Imagem salva e publicada com sucesso!');
         } else {
           setAdminMsg('⚠️ Imagem carregada, mas houve erro ao salvar no servidor.');
         }
@@ -659,9 +700,9 @@ export const ClaudeWowPreview: React.FC<any> = () => {
     const next = clone(data);
     if (!next.menu) {
       next.menu = [
-        { id: '1', title: 'Na Vitrine', url: '#produtos' },
-        { id: '2', title: 'Sobre', url: '#sobre' },
-        { id: '3', title: 'Onde encontrar', url: '#onde' },
+        { id: '1', title: 'na vitrine', url: '#produtos' },
+        { id: '2', title: 'sobre', url: '#sobre' },
+        { id: '3', title: 'pedir', url: '#onde' },
       ];
     }
     if (next.menu[index]) {
@@ -675,9 +716,9 @@ export const ClaudeWowPreview: React.FC<any> = () => {
     const next = clone(data);
     if (!next.menu) {
       next.menu = [
-        { id: '1', title: 'Na Vitrine', url: '#produtos' },
-        { id: '2', title: 'Sobre', url: '#sobre' },
-        { id: '3', title: 'Onde encontrar', url: '#onde' },
+        { id: '1', title: 'na vitrine', url: '#produtos' },
+        { id: '2', title: 'sobre', url: '#sobre' },
+        { id: '3', title: 'pedir', url: '#onde' },
       ];
     }
     const newId = String(Date.now());
@@ -699,7 +740,7 @@ export const ClaudeWowPreview: React.FC<any> = () => {
 
   const handleUpdateLogoUrl = (url: string) => {
     const next = clone(data);
-    if (!next.img) next.img = { logo: '', favicon: '' };
+    if (!next.img) next.img = { logo: '', favicon: '', hero_banner: '' };
     next.img.logo = url;
     setData(next);
     setHasUnsavedChanges(true);
@@ -708,7 +749,7 @@ export const ClaudeWowPreview: React.FC<any> = () => {
 
   const handleRemoveLogo = () => {
     const next = clone(data);
-    if (!next.img) next.img = { logo: '', favicon: '' };
+    if (!next.img) next.img = { logo: '', favicon: '', hero_banner: '' };
     next.img.logo = '';
     setData(next);
     setHasUnsavedChanges(true);
@@ -883,11 +924,11 @@ export const ClaudeWowPreview: React.FC<any> = () => {
             style={{ flexShrink: 0, minWidth: 'max-content' }}
           >
             <img
-              src={data.img?.logo || DEFAULT_LOGO_BASE64}
+              src={logoError ? DEFAULT_LOGO_BASE64 : (resolveImageUrl(data.img?.logo) || DEFAULT_LOGO_BASE64)}
               alt="Tomati"
               style={{ height: '34px', width: 'auto', display: 'block', flexShrink: 0 }}
-              onError={(e) => {
-                e.currentTarget.src = DEFAULT_LOGO_BASE64;
+              onError={() => {
+                setLogoError(true);
               }}
             />
           </a>
@@ -899,7 +940,7 @@ export const ClaudeWowPreview: React.FC<any> = () => {
               : [
                   { id: '1', title: 'na vitrine', url: '#produtos' },
                   { id: '2', title: 'sobre', url: '#sobre' },
-                  { id: '3', title: 'onde pedir', url: '#onde' },
+                  { id: '3', title: 'pedir', url: '#onde' },
                 ]
             ).map((mItem: any) => (
               <a key={mItem.id || mItem.url} href={mItem.url}>
@@ -932,7 +973,7 @@ export const ClaudeWowPreview: React.FC<any> = () => {
               : [
                   { id: '1', title: 'na vitrine', url: '#produtos' },
                   { id: '2', title: 'sobre', url: '#sobre' },
-                  { id: '3', title: 'onde pedir', url: '#onde' },
+                  { id: '3', title: 'pedir', url: '#onde' },
                 ]
             ).map((mItem: any, idx: number, arr: any[]) => (
               <React.Fragment key={mItem.id || mItem.url || idx}>
@@ -955,8 +996,19 @@ export const ClaudeWowPreview: React.FC<any> = () => {
       </header>
 
       <main id="top">
-        {/* 2. HERO SECTION (Vermelho Tomati #E63B1F) */}
-        <div className="hero">
+        {/* 2. HERO SECTION (Vermelho Tomati #E63B1F com Suporte a Banner de Fundo Opcional) */}
+        <div
+          className={`hero${data.img?.hero_banner ? ' has-banner' : ''}`}
+          style={
+            data.img?.hero_banner
+              ? {
+                  backgroundImage: `linear-gradient(rgba(20, 32, 26, 0.72), rgba(20, 32, 26, 0.82)), url(${resolveImageUrl(data.img.hero_banner)})`,
+                  backgroundSize: 'cover',
+                  backgroundPosition: 'center',
+                }
+              : undefined
+          }
+        >
           <div className="w">
             <h1>{data.t.hero_h}</h1>
             <p>{data.t.hero_p}</p>
@@ -1001,26 +1053,42 @@ export const ClaudeWowPreview: React.FC<any> = () => {
               {data.produtos.map((p: any, idx: number) => {
                 const spanClass = CL[p.nivel] || 's3';
                 const isCamp = Boolean(p.camp);
-                const blockStyle: React.CSSProperties = isCamp
-                  ? ({ '--c': '#FFC93C', '--bg2': '#14201A' } as any)
+                const hasBannerImg = Boolean(p.img && !failedImages[p.img]);
+                const isBannerStyle = (isCamp && hasBannerImg) || (p.nivel === 4 && hasBannerImg);
+
+                const blockStyle: React.CSSProperties = isBannerStyle
+                  ? ({
+                      backgroundImage: `linear-gradient(to right, rgba(11, 14, 12, 0.88) 0%, rgba(11, 14, 12, 0.65) 55%, rgba(11, 14, 12, 0.35) 100%), url(${resolveImageUrl(p.img)})`,
+                      backgroundSize: 'cover',
+                      backgroundPosition: 'center',
+                      backgroundRepeat: 'no-repeat',
+                      color: p.c || '#ffffff',
+                      border: '1px solid rgba(255, 255, 255, 0.22)',
+                      '--c': p.c || '#ffffff',
+                      '--bg2': p.bg || '#14201A',
+                    } as any)
+                  : isCamp
+                  ? ({ '--c': p.c || '#FFC93C', '--bg2': p.bg || '#14201A', background: p.bg || '#14201A' } as any)
                   : ({ background: p.bg, '--c': p.c, '--bg2': p.bg } as any);
 
                 return (
                   <div
                     key={idx}
-                    className={`blk ${spanClass}${isCamp ? ' camp' : ''}`}
+                    className={`blk ${spanClass}${isCamp ? ' camp' : ''}${isBannerStyle ? ' has-banner' : ''}`}
                     style={blockStyle}
                   >
-                    <div className="big">{p.nome}</div>
+                    <div className="big" style={isBannerStyle ? { color: p.c || '#ffffff', textShadow: '0 2px 10px rgba(0,0,0,0.6)' } : undefined}>
+                      {p.nome}
+                    </div>
 
-                    {!isCamp && (
+                    {!isCamp && !isBannerStyle && (
                       <div
                         className="prod"
                         style={{ '--r': `${p.r || 5}deg` } as any}
                       >
                         {p.img && !failedImages[p.img] ? (
                           <img
-                            src={p.img}
+                            src={resolveImageUrl(p.img)}
                             alt={p.nome}
                             onError={() => {
                               setFailedImages((prev) => ({ ...prev, [p.img]: true }));
@@ -1032,8 +1100,10 @@ export const ClaudeWowPreview: React.FC<any> = () => {
                       </div>
                     )}
 
-                    <div className="txt">
-                      <small>{p.texto}</small>
+                    <div className="txt" style={isBannerStyle ? { maxWidth: '100%' } : undefined}>
+                      <small style={isBannerStyle ? { color: 'rgba(255,255,255,0.95)', textShadow: '0 1px 6px rgba(0,0,0,0.6)', fontSize: '15px' } : undefined}>
+                        {p.texto}
+                      </small>
                       <div className="row">
                         {p.price && <span className="price">{p.price}</span>}
                         <a
@@ -1041,6 +1111,7 @@ export const ClaudeWowPreview: React.FC<any> = () => {
                           href={getUrl(p.link)}
                           target="_blank"
                           rel="noopener noreferrer"
+                          style={isBannerStyle ? { background: '#ffffff', color: '#14201A', fontWeight: 700 } : undefined}
                         >
                           {p.cta}
                         </a>
@@ -1438,6 +1509,31 @@ export const ClaudeWowPreview: React.FC<any> = () => {
             />
           </label>
           <label>
+            Imagem de fundo do Banner Principal / Hero (opcional)
+            <input
+              type="file"
+              accept="image/*"
+              onChange={(e) => handleFileUpload(e, 'hero_banner')}
+            />
+          </label>
+          <label style={{ marginTop: '4px' }}>
+            Ou link direto da imagem de fundo do Hero
+            <input
+              placeholder="https://... ou /uploads/..."
+              value={data.img?.hero_banner || ''}
+              onChange={(e) => handleUpdateField('img.hero_banner', e.target.value)}
+            />
+          </label>
+          {data.img?.hero_banner && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '6px', background: 'rgba(255,255,255,0.06)', padding: '6px 10px', borderRadius: '8px' }}>
+              <img src={resolveImageUrl(data.img.hero_banner)} alt="" style={{ height: '36px', maxWidth: '60px', objectFit: 'cover', borderRadius: '4px' }} />
+              <span style={{ fontSize: '11px', opacity: 0.8 }}>Banner de fundo ativo</span>
+              <button type="button" onClick={() => handleUpdateField('img.hero_banner', '')} style={{ marginLeft: 'auto' }}>
+                Remover
+              </button>
+            </div>
+          )}
+          <label>
             Título do Sobre
             <input
               value={data.t.sobre_h}
@@ -1757,7 +1853,64 @@ export const ClaudeWowPreview: React.FC<any> = () => {
                 </select>
               </label>
 
-              {!p.camp && (
+              {p.camp ? (
+                <div style={{ background: 'rgba(255,201,60,0.1)', border: '1px solid rgba(255,201,60,0.3)', borderRadius: '8px', padding: '12px', marginTop: '10px' }}>
+                  <div style={{ fontWeight: 600, fontSize: '13px', color: '#FFC93C', marginBottom: '6px' }}>
+                    🌟 Banner Promocional / Campanha
+                  </div>
+                  <p style={{ fontSize: '12px', opacity: 0.85, margin: '0 0 10px 0', lineHeight: '1.4' }}>
+                    Adicione uma imagem de fundo para o banner promocional. O título, texto e botão ficarão sobrepostos diretamente sobre a foto.
+                  </p>
+
+                  <label>
+                    Imagem de fundo do banner (upload)
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => handleFileUpload(e, '', i)}
+                    />
+                  </label>
+                  <label style={{ marginTop: '4px' }}>
+                    Ou link direto da imagem do banner
+                    <input
+                      placeholder="https://... ou /uploads/..."
+                      value={p.img || ''}
+                      onChange={(e) => handleUpdateProduct(i, 'img', e.target.value)}
+                    />
+                  </label>
+
+                  {p.img && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '6px', background: 'rgba(255,255,255,0.06)', padding: '6px 10px', borderRadius: '8px' }}>
+                      <img src={resolveImageUrl(p.img)} alt="" style={{ height: '40px', maxWidth: '60px', objectFit: 'cover', borderRadius: '4px' }} />
+                      <span style={{ fontSize: '11px', opacity: 0.8, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '140px' }}>
+                        {p.img.startsWith('/uploads') ? 'Banner no servidor' : p.img.startsWith('data:') ? 'Banner carregado' : 'URL externa'}
+                      </span>
+                      <button type="button" onClick={() => handleUpdateProduct(i, 'img', '')} style={{ marginLeft: 'auto' }}>
+                        Remover
+                      </button>
+                    </div>
+                  )}
+
+                  <div className="r" style={{ marginTop: '8px' }}>
+                    <label>
+                      Cor de fundo base
+                      <input
+                        type="color"
+                        value={p.bg || '#14201A'}
+                        onChange={(e) => handleUpdateProduct(i, 'bg', e.target.value)}
+                      />
+                    </label>
+                    <label>
+                      Cor do texto sobreposto
+                      <input
+                        type="color"
+                        value={p.c || '#ffffff'}
+                        onChange={(e) => handleUpdateProduct(i, 'c', e.target.value)}
+                      />
+                    </label>
+                  </div>
+                </div>
+              ) : (
                 <>
                   <div className="r">
                     <label>
@@ -1797,7 +1950,7 @@ export const ClaudeWowPreview: React.FC<any> = () => {
 
                   {p.img && (
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '6px', background: 'rgba(255,255,255,0.06)', padding: '6px 10px', borderRadius: '8px' }}>
-                      <img src={p.img} alt="" style={{ height: '40px', maxWidth: '60px', objectFit: 'contain' }} />
+                      <img src={resolveImageUrl(p.img)} alt="" style={{ height: '40px', maxWidth: '60px', objectFit: 'contain' }} />
                       <span style={{ fontSize: '11px', opacity: 0.8, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '140px' }}>
                         {p.img.startsWith('/uploads') ? 'Salvo no servidor' : p.img.startsWith('data:') ? 'Imagem carregada' : 'URL externa'}
                       </span>

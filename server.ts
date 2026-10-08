@@ -130,7 +130,7 @@ const DEFAULT_STORE_DATA = {
   menu: [
     { id: '1', title: 'na vitrine', url: '#produtos' },
     { id: '2', title: 'sobre', url: '#sobre' },
-    { id: '3', title: 'onde pedir', url: '#onde' },
+    { id: '3', title: 'pedir', url: '#onde' },
   ],
   regiao: 'Curitiba e Região',
   horario: 'Segunda a Sexta 09hs as 21hs. Sábado e Domingo 16hs as 21hs.',
@@ -278,7 +278,7 @@ function normalizeStoreData(input: any) {
     price: String(p?.price || ''),
     link: typeof p?.link === 'string' ? p.link : 'portal',
     cta: String(p?.cta || 'Pedir agora'),
-    img: typeof p?.img === 'string' && (p.img.startsWith('/uploads') || p.img.startsWith('http')) ? p.img : '',
+    img: typeof p?.img === 'string' && (p.img.startsWith('/uploads') || p.img.startsWith('http') || p.img.startsWith('data:image/')) ? p.img : '',
   }));
 
   return {
@@ -287,8 +287,9 @@ function normalizeStoreData(input: any) {
     links: sanitizedLinks,
     handles: { ...DEFAULT_STORE_DATA.handles, ...(input.handles || {}) },
     img: {
-      logo: typeof input.img?.logo === 'string' ? input.img.logo : '',
-      favicon: typeof input.img?.favicon === 'string' ? input.img.favicon : '',
+      logo: typeof input.img?.logo === 'string' && input.img.logo ? input.img.logo : DEFAULT_STORE_DATA.img.logo,
+      favicon: typeof input.img?.favicon === 'string' && input.img.favicon ? input.img.favicon : DEFAULT_STORE_DATA.img.favicon,
+      hero_banner: typeof input.img?.hero_banner === 'string' ? input.img.hero_banner : '',
     },
     t: { ...DEFAULT_STORE_DATA.t, ...(input.t || {}) },
     menu: sanitizedMenu,
