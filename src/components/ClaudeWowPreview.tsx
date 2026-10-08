@@ -3,6 +3,7 @@ import { TomatiLogo } from './TomatiLogo';
 import { AdminAuthModal } from './AdminAuthModal';
 import { PWAInstallModal } from './PWAInstallModal';
 import { Smartphone } from 'lucide-react';
+import { DEFAULT_LOGO_BASE64 } from '../assets';
 
 // Configuração padrão com os dados e imagens oficiais salvos da Tomati
 const D = {
@@ -17,13 +18,13 @@ const D = {
     tiktok: '@tomatibrasil',
   },
   img: {
-    logo: '/uploads/brand-logo-1791487284490-4c8cc840fb27055f.png',
+    logo: DEFAULT_LOGO_BASE64,
     favicon: '/uploads/brand-favicon-1791487298420-3e2e18722687098a.png',
   },
   menu: [
     { id: '1', title: 'na vitrine', url: '#produtos' },
     { id: '2', title: 'sobre', url: '#sobre' },
-    { id: '3', title: 'onde encontrar', url: '#onde' },
+    { id: '3', title: 'onde pedir', url: '#onde' },
   ],
   regiao: 'Curitiba e Região',
   horario: 'Segunda a Sexta 09hs as 21hs. Sábado e Domingo 16hs as 21hs.',
@@ -295,6 +296,7 @@ export const ClaudeWowPreview: React.FC<any> = () => {
   const [confirmDeleteIdx, setConfirmDeleteIdx] = useState<number | null>(null);
   const [confirmReset, setConfirmReset] = useState(false);
   const [isPWAInstallModalOpen, setIsPWAInstallModalOpen] = useState(false);
+  const [failedImages, setFailedImages] = useState<Record<string, boolean>>({});
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Estados de Gerenciamento de Administradores e Troca de Senha
@@ -880,17 +882,14 @@ export const ClaudeWowPreview: React.FC<any> = () => {
             aria-label="Tomati"
             style={{ flexShrink: 0, minWidth: 'max-content' }}
           >
-            {data.img?.logo ? (
-              <img
-                src={data.img.logo}
-                alt="Tomati"
-                style={{ height: '34px', width: 'auto', display: 'block', flexShrink: 0 }}
-              />
-            ) : (
-              <span className="text-white font-extrabold tracking-tight text-2xl font-serif inline-flex items-center">
-                tomati<span className="text-[#FFC93C]">.</span>
-              </span>
-            )}
+            <img
+              src={data.img?.logo || DEFAULT_LOGO_BASE64}
+              alt="Tomati"
+              style={{ height: '34px', width: 'auto', display: 'block', flexShrink: 0 }}
+              onError={(e) => {
+                e.currentTarget.src = DEFAULT_LOGO_BASE64;
+              }}
+            />
           </a>
 
           {/* Navegação Desktop */}
@@ -898,9 +897,9 @@ export const ClaudeWowPreview: React.FC<any> = () => {
             {(data.menu && data.menu.length > 0
               ? data.menu
               : [
-                  { id: '1', title: 'Na Vitrine', url: '#produtos' },
-                  { id: '2', title: 'Sobre', url: '#sobre' },
-                  { id: '3', title: 'Onde encontrar', url: '#onde' },
+                  { id: '1', title: 'na vitrine', url: '#produtos' },
+                  { id: '2', title: 'sobre', url: '#sobre' },
+                  { id: '3', title: 'onde pedir', url: '#onde' },
                 ]
             ).map((mItem: any) => (
               <a key={mItem.id || mItem.url} href={mItem.url}>
@@ -931,9 +930,9 @@ export const ClaudeWowPreview: React.FC<any> = () => {
             {(data.menu && data.menu.length > 0
               ? data.menu
               : [
-                  { id: '1', title: 'Na Vitrine', url: '#produtos' },
-                  { id: '2', title: 'Sobre', url: '#sobre' },
-                  { id: '3', title: 'Onde encontrar', url: '#onde' },
+                  { id: '1', title: 'na vitrine', url: '#produtos' },
+                  { id: '2', title: 'sobre', url: '#sobre' },
+                  { id: '3', title: 'onde pedir', url: '#onde' },
                 ]
             ).map((mItem: any, idx: number, arr: any[]) => (
               <React.Fragment key={mItem.id || mItem.url || idx}>
@@ -1019,8 +1018,14 @@ export const ClaudeWowPreview: React.FC<any> = () => {
                         className="prod"
                         style={{ '--r': `${p.r || 5}deg` } as any}
                       >
-                        {p.img ? (
-                          <img src={p.img} alt={p.nome} />
+                        {p.img && !failedImages[p.img] ? (
+                          <img
+                            src={p.img}
+                            alt={p.nome}
+                            onError={() => {
+                              setFailedImages((prev) => ({ ...prev, [p.img]: true }));
+                            }}
+                          />
                         ) : (
                           renderArt(p.art, p.nome)
                         )}
@@ -1157,17 +1162,14 @@ export const ClaudeWowPreview: React.FC<any> = () => {
         <div className="w">
           <div>
             <div className="logo" style={{ color: '#fff' }}>
-              {data.img?.logo ? (
-                <img
-                  src={data.img.logo}
-                  alt="Tomati"
-                  style={{ height: '36px', width: 'auto', display: 'block', flexShrink: 0 }}
-                />
-              ) : (
-                <span className="text-white font-extrabold tracking-tight text-2xl font-serif inline-flex items-center">
-                  tomati<span className="text-[#FFC93C]">.</span>
-                </span>
-              )}
+              <img
+                src={data.img?.logo || DEFAULT_LOGO_BASE64}
+                alt="Tomati"
+                style={{ height: '36px', width: 'auto', display: 'block', flexShrink: 0 }}
+                onError={(e) => {
+                  e.currentTarget.src = DEFAULT_LOGO_BASE64;
+                }}
+              />
             </div>
             <p style={{ marginTop: '8px' }}>mais perto, mais fácil.</p>
           </div>
@@ -1476,9 +1478,9 @@ export const ClaudeWowPreview: React.FC<any> = () => {
             {(data.menu && data.menu.length > 0
               ? data.menu
               : [
-                  { id: '1', title: 'Na Vitrine', url: '#produtos' },
-                  { id: '2', title: 'Sobre', url: '#sobre' },
-                  { id: '3', title: 'Onde encontrar', url: '#onde' },
+                  { id: '1', title: 'na vitrine', url: '#produtos' },
+                  { id: '2', title: 'sobre', url: '#sobre' },
+                  { id: '3', title: 'onde pedir', url: '#onde' },
                 ]
             ).map((mItem: any, mIdx: number) => (
               <div

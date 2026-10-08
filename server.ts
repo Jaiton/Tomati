@@ -130,7 +130,7 @@ const DEFAULT_STORE_DATA = {
   menu: [
     { id: '1', title: 'na vitrine', url: '#produtos' },
     { id: '2', title: 'sobre', url: '#sobre' },
-    { id: '3', title: 'onde encontrar', url: '#onde' },
+    { id: '3', title: 'onde pedir', url: '#onde' },
   ],
   regiao: 'Curitiba e Região',
   horario: 'Segunda a Sexta 09hs as 21hs. Sábado e Domingo 16hs as 21hs.',
