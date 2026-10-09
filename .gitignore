@@ -11,3 +11,4 @@ data/*.backup.json
 !data/store-data.json
 !public/store-data.json
 !public/uploads/
+!public/uploads/**

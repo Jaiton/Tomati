@@ -371,6 +371,12 @@ export const AdminAuthModal: React.FC<AdminAuthModalProps> = ({
                   </>
                 )}
               </button>
+
+              <div className="mt-2.5 p-2.5 rounded-xl bg-stone-100 border border-stone-200/80 text-[11px] text-stone-600 space-y-0.5">
+                <span className="font-semibold text-stone-700 block">Primeiro acesso ao painel:</span>
+                <div>Usuário: <code className="bg-stone-200 px-1 py-0.5 rounded text-stone-800 font-mono">admin</code> | Senha: <code className="bg-stone-200 px-1 py-0.5 rounded text-stone-800 font-mono">tomati@2026</code></div>
+                <div className="text-[10px] text-stone-500 pt-0.5">Você pode alterar sua senha após entrar no painel da loja.</div>
+              </div>
             </form>
           ) : (
             <form onSubmit={handleRegisterSubmit} className="space-y-3">

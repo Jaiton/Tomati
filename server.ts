@@ -37,14 +37,66 @@ app.use('/uploads', (_req, res) => {
   res.status(404).type('text/plain').send('Arquivo não encontrado em /uploads');
 });
 
-// Gerenciamento de Sessões em Memória (Tokens Criptográficos)
+// Gerenciamento de Sessões com Tokens Assinados Criptograficamente (Sobrevive a reinícios do servidor)
 interface SessionData {
   username: string;
   name: string;
   expiresAt: number;
 }
 const activeSessions = new Map<string, SessionData>();
+const revokedTokens = new Set<string>();
 const SESSION_DURATION_MS = 7 * 24 * 60 * 60 * 1000; // 7 dias
+
+// Chave secreta de assinatura persistida no disco ou configurada via ENV
+function getSessionSecret(): string {
+  if (process.env.SESSION_SECRET && process.env.SESSION_SECRET.trim().length >= 16) {
+    return process.env.SESSION_SECRET.trim();
+  }
+  const secretPath = path.join(DATA_DIR, 'session-secret.txt');
+  try {
+    if (fs.existsSync(secretPath)) {
+      const existing = fs.readFileSync(secretPath, 'utf-8').trim();
+      if (existing.length >= 16) return existing;
+    }
+  } catch {}
+  const generated = crypto.randomBytes(32).toString('hex');
+  try {
+    fs.writeFileSync(secretPath, generated, 'utf-8');
+  } catch {}
+  return generated;
+}
+
+const SESSION_SECRET = getSessionSecret();
+
+function signSessionToken(data: SessionData): string {
+  const payloadStr = JSON.stringify(data);
+  const payloadBase64 = Buffer.from(payloadStr, 'utf-8').toString('base64url');
+  const signature = crypto.createHmac('sha256', SESSION_SECRET).update(payloadBase64).digest('base64url');
+  return `${payloadBase64}.${signature}`;
+}
+
+function verifySessionToken(token: string): SessionData | null {
+  try {
+    if (!token || revokedTokens.has(token)) return null;
+    const parts = token.split('.');
+    if (parts.length !== 2) return null;
+    const [payloadBase64, signature] = parts;
+    const expectedSig = crypto.createHmac('sha256', SESSION_SECRET).update(payloadBase64).digest('base64url');
+    if (!crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expectedSig))) {
+      return null;
+    }
+    const parsed = JSON.parse(Buffer.from(payloadBase64, 'base64url').toString('utf-8')) as SessionData;
+    if (!parsed || !parsed.username || typeof parsed.expiresAt !== 'number') {
+      return null;
+    }
+    if (parsed.expiresAt < Date.now()) {
+      return null;
+    }
+    return parsed;
+  } catch {
+    return null;
+  }
+}
 
 // Proteção contra Força Bruta no Login (Rate Limiting simples por IP)
 interface LoginAttempt {
@@ -93,7 +145,7 @@ function detectImageFormat(buf: Buffer): 'png' | 'jpg' | 'webp' | null {
   return null;
 }
 
-// Middleware de Autenticação Obrigatória para rotas sensíveis
+// Middleware de Autenticação Obrigatória para rotas sensíveis (com suporte a restauração de token assinado)
 function requireAuth(req: express.Request, res: express.Response, next: express.NextFunction) {
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -101,7 +153,21 @@ function requireAuth(req: express.Request, res: express.Response, next: express.
   }
 
   const token = authHeader.substring(7).trim();
-  const session = activeSessions.get(token);
+  let session = activeSessions.get(token);
+
+  // Se o servidor reiniciou e o token não está no Map da RAM, verifica a assinatura criptográfica
+  if (!session || session.expiresAt < Date.now()) {
+    const verified = verifySessionToken(token);
+    if (verified) {
+      // Confirma que o administrador ainda existe no banco
+      const admins = getAdminUsers();
+      const userExists = admins.some((a) => a.username.toLowerCase() === verified.username.toLowerCase());
+      if (userExists) {
+        session = verified;
+        activeSessions.set(token, session);
+      }
+    }
+  }
 
   if (!session || session.expiresAt < Date.now()) {
     if (session) activeSessions.delete(token);
@@ -370,20 +436,22 @@ function getAdminUsers(): StoredAdmin[] {
     }
   }
 
-  // Senha inicial protegida com hash seguro (configurada via env ou gerada aleatoriamente na inicialização)
-  const initialPassword = process.env.ADMIN_INITIAL_PASSWORD || crypto.randomBytes(8).toString('hex');
+  // Senha inicial protegida com hash seguro (configurada via env ou padrão 'tomati@2026')
+  const defaultUser = (process.env.ADMIN_USER || 'admin').trim().toLowerCase();
+  const initialPassword = (process.env.ADMIN_PASSWORD || process.env.ADMIN_INITIAL_PASSWORD || 'tomati@2026').trim();
+  const defaultName = (process.env.ADMIN_NAME || 'Administrador Tomati').trim();
+
   const defaultAdmins: StoredAdmin[] = [
     {
-      username: 'admin',
+      username: defaultUser,
       passwordHash: hashPassword(initialPassword),
-      name: 'Administrador Tomati',
+      name: defaultName,
       createdAt: Date.now(),
     },
   ];
   atomicWriteJsonSync(ADMIN_USERS_FILE, defaultAdmins);
-  if (!process.env.ADMIN_INITIAL_PASSWORD) {
-    console.log(`[Tomati Security] Administrador inicial 'admin' gerado com chave criptografada.`);
-  }
+  const isCustomEnv = Boolean(process.env.ADMIN_PASSWORD || process.env.ADMIN_INITIAL_PASSWORD);
+  console.log(`[Tomati Security] Administrador inicial configurado: usuário '${defaultUser}' (senha: ${isCustomEnv ? '[configurada via ENV]' : 'tomati@2026'})`);
   return defaultAdmins;
 }
 
@@ -523,13 +591,14 @@ app.post('/api/admin/login', (req, res) => {
       // Sucesso: limpa tentativas falhas
       loginAttempts.delete(clientIp);
 
-      // Gera token criptográfico de sessão
-      const token = crypto.randomBytes(32).toString('hex');
-      activeSessions.set(token, {
+      // Gera token criptográfico assinado de sessão (sobrevive a reinício do servidor)
+      const sessionData: SessionData = {
         username: found.username,
         name: found.name,
         expiresAt: now + SESSION_DURATION_MS,
-      });
+      };
+      const token = signSessionToken(sessionData);
+      activeSessions.set(token, sessionData);
 
       return res.json({
         success: true,
@@ -572,6 +641,7 @@ app.post('/api/admin/logout', (req, res) => {
   if (authHeader && authHeader.startsWith('Bearer ')) {
     const token = authHeader.substring(7).trim();
     activeSessions.delete(token);
+    revokedTokens.add(token);
   }
   return res.json({ success: true });
 });
@@ -604,16 +674,18 @@ app.post('/api/admin/change-password', requireAuth, (req, res) => {
     for (const [t, s] of activeSessions.entries()) {
       if (s.username.toLowerCase() === session.username.toLowerCase()) {
         activeSessions.delete(t);
+        revokedTokens.add(t);
       }
     }
 
-    // Emite novo token exclusivo para a sessão atual
-    const newToken = crypto.randomBytes(32).toString('hex');
-    activeSessions.set(newToken, {
+    // Emite novo token assinado exclusivo para a sessão atual
+    const sessionData: SessionData = {
       username: session.username,
       name: session.name,
       expiresAt: Date.now() + SESSION_DURATION_MS,
-    });
+    };
+    const newToken = signSessionToken(sessionData);
+    activeSessions.set(newToken, sessionData);
 
     return res.json({ success: true, message: 'Senha alterada com sucesso!', token: newToken });
   } catch (error) {
@@ -645,7 +717,17 @@ app.post('/api/admin/register', (req, res) => {
 
     if (authHeader && authHeader.startsWith('Bearer ')) {
       const token = authHeader.substring(7).trim();
-      const session = activeSessions.get(token);
+      let session = activeSessions.get(token);
+      if (!session) {
+        const verified = verifySessionToken(token);
+        if (verified) {
+          const userExists = admins.some((a) => a.username.toLowerCase() === verified.username.toLowerCase());
+          if (userExists) {
+            session = verified;
+            activeSessions.set(token, session);
+          }
+        }
+      }
       if (session && session.expiresAt >= Date.now()) {
         isAuthenticated = true;
         requestingUser = session.username;
@@ -687,13 +769,14 @@ app.post('/api/admin/register', (req, res) => {
     atomicWriteJsonSync(ADMIN_USERS_FILE, updated);
     console.log(`[Tomati Server] Administrador cadastrado (${requestingUser}): ${cleanUser}`);
 
-    // Cria e retorna sessão ativa para autenticação imediata
-    const token = crypto.randomBytes(32).toString('hex');
-    activeSessions.set(token, {
+    // Cria e retorna sessão ativa com token assinado para autenticação imediata
+    const sessionData: SessionData = {
       username: cleanUser,
       name: cleanName,
       expiresAt: Date.now() + SESSION_DURATION_MS,
-    });
+    };
+    const token = signSessionToken(sessionData);
+    activeSessions.set(token, sessionData);
 
     return res.json({
       success: true,
