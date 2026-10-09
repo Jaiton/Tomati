@@ -484,21 +484,21 @@ h2 {
 .camp {
   background: var(--ink);
   color: #fff;
-  border: 2px dashed var(--butter);
+  border: 2px dashed var(--red, #E63B1F);
   position: relative;
   overflow: hidden;
   transition: all 0.3s ease;
 }
 
 .camp.has-banner {
-  border: 2px solid var(--butter);
+  border: 2px solid var(--red, #E63B1F);
   background-size: cover !important;
   background-position: center !important;
   background-repeat: no-repeat !important;
 }
 
 .blk.has-banner {
-  border: 2px solid var(--butter);
+  border: 2px solid var(--red, #E63B1F);
 }
 
 .camp.has-banner::before,

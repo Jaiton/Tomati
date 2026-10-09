@@ -3,7 +3,7 @@ import { TomatiLogo } from './TomatiLogo';
 import { AdminAuthModal } from './AdminAuthModal';
 import { PWAInstallModal } from './PWAInstallModal';
 import { Smartphone } from 'lucide-react';
-import { DEFAULT_LOGO_BASE64 } from '../assets';
+import { DEFAULT_LOGO_BASE64, getFallbackProductImage } from '../assets';
 
 // Configuração padrão com os dados e imagens oficiais salvos da Tomati
 const D = {
@@ -18,8 +18,8 @@ const D = {
     tiktok: '@tomatibrasil',
   },
   img: {
-    logo: DEFAULT_LOGO_BASE64,
-    favicon: '/uploads/brand-favicon-1791487298420-3e2e18722687098a.png',
+    logo: '/brand-logo.png',
+    favicon: '/favicon.ico',
     hero_banner: '',
   },
   menu: [
@@ -74,7 +74,7 @@ const D = {
       bg: '#D9A066',
       c: '#14201A',
       nivel: 1,
-      img: '',
+      img: '/uploads/prod-2-1791489729222-e1e477df9b7369a1.webp',
       art: { k: 'jar', body: '#B5651D', lab: '#FFF3CF', ink: '#6B3A12' },
       r: 5,
     },
@@ -114,14 +114,14 @@ const D = {
       nivel: 4,
       bg: '#14201A',
       c: '#FFC93C',
-      borderColor: '#FFC93C',
-      img: '',
+      borderColor: '#E63B1F',
+      img: '/uploads/prod-5-1791490811727-a8f97bba15148e5b.webp',
       r: 0,
     },
   ],
 };
 
-const K = 'tomati_site_v1';
+const K = 'tomati_site_v2';
 const clone = <T,>(o: T): T => JSON.parse(JSON.stringify(o));
 const CL: Record<number, string> = { 4: 's6', 3: 's4', 2: 's3', 1: 's2' };
 
@@ -138,6 +138,16 @@ function resolveImageUrl(url?: string): string {
     return `${cleanBase}${cleanPath}`;
   }
   return cleanPath;
+}
+
+// Helper para obter a imagem de um produto com fallback para assets embutidos
+function getProductImage(p: any, index: number, failedMap: Record<string, boolean>): string {
+  if (p.img && !failedMap[p.img]) {
+    return resolveImageUrl(p.img);
+  }
+  const embedded = getFallbackProductImage(p.nome, index);
+  if (embedded) return embedded;
+  return resolveImageUrl(p.img);
 }
 
 // Gerador de ilustrações vetoriais idêntico ao código do Claude
@@ -1077,13 +1087,14 @@ export const ClaudeWowPreview: React.FC<any> = () => {
               {data.produtos.map((p: any, idx: number) => {
                 const spanClass = CL[p.nivel] || 's3';
                 const isCamp = Boolean(p.camp);
-                const hasBannerImg = Boolean(p.img && !failedImages[p.img]);
+                const displayImg = getProductImage(p, idx, failedImages);
+                const hasBannerImg = Boolean(displayImg);
                 const isBannerStyle = (isCamp && hasBannerImg) || (p.nivel === 4 && hasBannerImg);
-                const bannerBorderColor = p.borderColor || '#FFC93C';
+                const bannerBorderColor = p.borderColor || '#E63B1F';
 
                 const blockStyle: React.CSSProperties = isBannerStyle
                   ? ({
-                      backgroundImage: `linear-gradient(to right, rgba(11, 14, 12, 0.88) 0%, rgba(11, 14, 12, 0.65) 55%, rgba(11, 14, 12, 0.35) 100%), url(${resolveImageUrl(p.img)})`,
+                      backgroundImage: `linear-gradient(to right, rgba(11, 14, 12, 0.88) 0%, rgba(11, 14, 12, 0.65) 55%, rgba(11, 14, 12, 0.35) 100%), url(${displayImg})`,
                       backgroundSize: 'cover',
                       backgroundPosition: 'center',
                       backgroundRepeat: 'no-repeat',
@@ -1127,12 +1138,14 @@ export const ClaudeWowPreview: React.FC<any> = () => {
                         className="prod"
                         style={{ '--r': `${p.r || 5}deg` } as any}
                       >
-                        {p.img && !failedImages[p.img] ? (
+                        {displayImg ? (
                           <img
-                            src={resolveImageUrl(p.img)}
+                            src={displayImg}
                             alt={p.nome}
                             onError={() => {
-                              setFailedImages((prev) => ({ ...prev, [p.img]: true }));
+                              if (p.img && !failedImages[p.img]) {
+                                setFailedImages((prev) => ({ ...prev, [p.img]: true }));
+                              }
                             }}
                           />
                         ) : (
@@ -1922,7 +1935,7 @@ export const ClaudeWowPreview: React.FC<any> = () => {
 
                   {p.img && (
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '6px', background: 'rgba(255,255,255,0.06)', padding: '6px 10px', borderRadius: '8px' }}>
-                      <img src={resolveImageUrl(p.img)} alt="" style={{ height: '40px', maxWidth: '60px', objectFit: 'cover', borderRadius: '4px' }} />
+                      <img src={getProductImage(p, i, failedImages)} alt="" style={{ height: '40px', maxWidth: '60px', objectFit: 'cover', borderRadius: '4px' }} />
                       <span style={{ fontSize: '11px', opacity: 0.8, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '140px' }}>
                         {p.img.startsWith('/uploads') ? 'Banner no servidor' : p.img.startsWith('data:') ? 'Banner carregado' : 'URL externa'}
                       </span>
@@ -2016,7 +2029,7 @@ export const ClaudeWowPreview: React.FC<any> = () => {
 
                   {p.img && (
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '6px', background: 'rgba(255,255,255,0.06)', padding: '6px 10px', borderRadius: '8px' }}>
-                      <img src={resolveImageUrl(p.img)} alt="" style={{ height: '40px', maxWidth: '60px', objectFit: 'contain' }} />
+                      <img src={getProductImage(p, i, failedImages)} alt="" style={{ height: '40px', maxWidth: '60px', objectFit: 'contain' }} />
                       <span style={{ fontSize: '11px', opacity: 0.8, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '140px' }}>
                         {p.img.startsWith('/uploads') ? 'Salvo no servidor' : p.img.startsWith('data:') ? 'Imagem carregada' : 'URL externa'}
                       </span>
