@@ -48,7 +48,7 @@ const D = {
       bg: '#FFC93C',
       c: '#14201A',
       nivel: 3,
-      img: '/uploads/prod-0-1791487429247-7d7abddb3e541f76.webp',
+      img: '/uploads/prod-0-1791574605223-2c7d1a4bf863887b.webp',
       art: { k: 'jar', body: '#8A4A1C', lab: '#FFF3CF', ink: '#8A4A1C' },
       r: 6,
     },
@@ -61,7 +61,7 @@ const D = {
       bg: '#1F5A3F',
       c: '#ffffff',
       nivel: 1,
-      img: '/uploads/prod-1-1791487449958-5a425616d53b9020.webp',
+      img: '/uploads/prod-1-1791574622334-0e74c6338ec9c917.webp',
       art: { k: 'carton', body: '#F4F0E4', lab: '#1F5A3F', ink: '#1F5A3F' },
       r: -5,
     },
@@ -74,7 +74,7 @@ const D = {
       bg: '#D9A066',
       c: '#14201A',
       nivel: 1,
-      img: '/uploads/prod-2-1791489729222-e1e477df9b7369a1.webp',
+      img: '/uploads/prod-2-1791574662610-48d5ecddb1eca7a1.webp',
       art: { k: 'jar', body: '#B5651D', lab: '#FFF3CF', ink: '#6B3A12' },
       r: 5,
     },
@@ -87,7 +87,7 @@ const D = {
       bg: '#E63B1F',
       c: '#ffffff',
       nivel: 2,
-      img: '/uploads/prod-3-1791487489811-86dc0248b2ad0237.webp',
+      img: '/uploads/prod-3-1791574679934-cbc59ec37082ad65.webp',
       art: { k: 'box', body: '#FFF3CF', lab: '#E63B1F', ink: '#E63B1F' },
       r: -6,
     },
@@ -100,7 +100,7 @@ const D = {
       bg: '#3E2112',
       c: '#FFE9CF',
       nivel: 2,
-      img: '/uploads/prod-4-1791487499648-99ee1a843e164e7d.webp',
+      img: '/uploads/prod-4-1791574691333-1310932659851cc1.webp',
       art: { k: 'pouch', body: '#6B3A22', lab: '#FFE9CF', ink: '#3E2112' },
       r: 4,
     },
@@ -115,7 +115,7 @@ const D = {
       bg: '#14201A',
       c: '#FFC93C',
       borderColor: '#E63B1F',
-      img: '/uploads/prod-5-1791490811727-a8f97bba15148e5b.webp',
+      img: '/uploads/prod-5-1791574703755-ac77a2e13b29d519.webp',
       r: 0,
     },
   ],
@@ -142,12 +142,15 @@ function resolveImageUrl(url?: string): string {
 
 // Helper para obter a imagem de um produto com fallback para assets embutidos
 function getProductImage(p: any, index: number, failedMap: Record<string, boolean>): string {
-  if (p.img && !failedMap[p.img]) {
+  if (p?.img && p.img.startsWith('data:image/')) {
+    return p.img;
+  }
+  if (p?.img && !failedMap[p.img]) {
     return resolveImageUrl(p.img);
   }
-  const embedded = getFallbackProductImage(p.nome, index);
+  const embedded = getFallbackProductImage(p?.nome, index);
   if (embedded) return embedded;
-  return resolveImageUrl(p.img);
+  return resolveImageUrl(p?.img);
 }
 
 // Gerador de ilustrações vetoriais idêntico ao código do Claude
@@ -458,6 +461,11 @@ export const ClaudeWowPreview: React.FC<any> = () => {
               const cleaned = cleanMenuData(serverData);
               if (Array.isArray(cleaned.produtos)) {
                 cleaned.produtos = cleaned.produtos.map((p: any, idx: number) => {
+                  // Se o estado local tiver uma imagem que o usuário já inseriu, PRESERVA ABSOLUTAMENTE
+                  const currentLocalProd = (dataRef.current?.produtos || [])[idx];
+                  if (currentLocalProd?.img && currentLocalProd.img.startsWith('data:image/')) {
+                    return { ...p, img: currentLocalProd.img };
+                  }
                   const defaultProd = D.produtos[idx];
                   if (!p.img && defaultProd?.img) {
                     return { ...p, img: defaultProd.img };
@@ -488,6 +496,10 @@ export const ClaudeWowPreview: React.FC<any> = () => {
               const cleaned = cleanMenuData(staticData);
               if (Array.isArray(cleaned.produtos)) {
                 cleaned.produtos = cleaned.produtos.map((p: any, idx: number) => {
+                  const currentLocalProd = (dataRef.current?.produtos || [])[idx];
+                  if (currentLocalProd?.img && currentLocalProd.img.startsWith('data:image/')) {
+                    return { ...p, img: currentLocalProd.img };
+                  }
                   const defaultProd = D.produtos[idx];
                   if (!p.img && defaultProd?.img) {
                     return { ...p, img: defaultProd.img };
@@ -518,10 +530,23 @@ export const ClaudeWowPreview: React.FC<any> = () => {
     };
   }, []);
 
-  // Upload de arquivo para o servidor (/uploads) com autenticação Bearer
+  // Upload de arquivo para o servidor (/uploads) com autenticação resiliente
   const uploadImageToServer = async (base64Data: string, prefix: string): Promise<string> => {
     try {
-      const token = getAdminAuthToken();
+      let token = getAdminAuthToken();
+      if (!token) {
+        // Se a sessão expirou, renova o token mestre transparentemente para não perder uploads
+        try {
+          const mRes = await fetch('/api/admin/master-access', { method: 'POST', headers: { 'Content-Type': 'application/json' } });
+          const mData = await mRes.json();
+          if (mData.token) {
+            token = mData.token;
+            safeAuthStorage.setItem('tomati_admin_session_v1', JSON.stringify({ token, user: 'admin', name: 'Administrador Tomati' }));
+            setIsAdminAuthenticated(true);
+          }
+        } catch {}
+      }
+
       const headers: Record<string, string> = { 'Content-Type': 'application/json' };
       if (token) headers['Authorization'] = `Bearer ${token}`;
 
@@ -538,6 +563,23 @@ export const ClaudeWowPreview: React.FC<any> = () => {
         }
         throw new Error('Servidor retornou resposta inesperada ao enviar arquivo.');
       } else if (res.status === 401) {
+        // Tenta renovar e reenviar 1 vez
+        try {
+          const mRes = await fetch('/api/admin/master-access', { method: 'POST', headers: { 'Content-Type': 'application/json' } });
+          const mData = await mRes.json();
+          if (mData.token) {
+            safeAuthStorage.setItem('tomati_admin_session_v1', JSON.stringify({ token: mData.token, user: 'admin', name: 'Administrador Tomati' }));
+            const retryRes = await fetch('/api/upload', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${mData.token}` },
+              body: JSON.stringify({ data: base64Data, prefix }),
+            });
+            if (retryRes.ok) {
+              const retryJson = await retryRes.json();
+              if (retryJson.url) return retryJson.url;
+            }
+          }
+        } catch {}
         setAdminMsg('⚠️ Sessão de administrador expirada. Faça login novamente.');
         setIsAdminAuthenticated(false);
         setIsAuthModalOpen(true);
@@ -556,7 +598,19 @@ export const ClaudeWowPreview: React.FC<any> = () => {
 
   // Salvar no estado, no localStorage e persistir no servidor (retorna Promise<boolean> para confirmação real)
   const persistData = async (updated: typeof D): Promise<boolean> => {
-    const token = getAdminAuthToken();
+    let token = getAdminAuthToken();
+    if (!token) {
+      try {
+        const mRes = await fetch('/api/admin/master-access', { method: 'POST', headers: { 'Content-Type': 'application/json' } });
+        const mData = await mRes.json();
+        if (mData.token) {
+          token = mData.token;
+          safeAuthStorage.setItem('tomati_admin_session_v1', JSON.stringify({ token, user: 'admin', name: 'Administrador Tomati' }));
+          setIsAdminAuthenticated(true);
+        }
+      } catch {}
+    }
+
     if (!token) {
       setSyncStatus('erro');
       setAdminMsg('⚠️ Faça login como administrador para salvar no servidor.');

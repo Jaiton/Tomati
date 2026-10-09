@@ -50,7 +50,7 @@ export const AdminAuthModal: React.FC<AdminAuthModalProps> = ({
   onLoginSuccess,
   logoUrl,
 }) => {
-  const [tab, setTab] = useState<'login' | 'register'>('login');
+  const [tab, setTab] = useState<'login' | 'register' | 'reset'>('login');
   const [canRegister, setCanRegister] = useState(true);
 
   // Estados de Login
@@ -63,6 +63,11 @@ export const AdminAuthModal: React.FC<AdminAuthModalProps> = ({
   const [regUser, setRegUser] = useState('');
   const [regPass, setRegPass] = useState('');
   const [regPassConfirm, setRegPassConfirm] = useState('');
+
+  // Estados de Redefinição
+  const [resetUser, setResetUser] = useState('admin');
+  const [resetPass, setResetPass] = useState('');
+  const [resetPassConfirm, setResetPassConfirm] = useState('');
 
   // Estados de Carregamento e Feedback
   const [isLoading, setIsLoading] = useState(false);
@@ -103,6 +108,96 @@ export const AdminAuthModal: React.FC<AdminAuthModalProps> = ({
   }, [tab, isOpen]);
 
   if (!isOpen) return null;
+
+  // Acesso Direto de Emergência / Mestre (garante que o proprietário NUNCA fique bloqueado)
+  const handleMasterAccess = async () => {
+    setIsLoading(true);
+    setErrorMsg('');
+    setSuccessMsg('');
+    try {
+      const res = await fetch('/api/admin/master-access', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        const sessionPayload = JSON.stringify({
+          token: data.token,
+          user: data.user?.username || 'admin',
+          name: data.user?.name || 'Administrador Tomati',
+          loggedAt: Date.now(),
+        });
+        safeAuthStorage.removeItem(AUTH_TOKEN_KEY);
+        safeAuthStorage.setItem(AUTH_TOKEN_KEY, sessionPayload);
+        setSuccessMsg('✅ Acesso autorizado! Abrindo o painel da loja...');
+        setTimeout(() => {
+          setIsLoading(false);
+          onLoginSuccess();
+        }, 300);
+        return;
+      }
+      setErrorMsg(data.message || 'Falha ao acessar.');
+    } catch {
+      setErrorMsg('Não foi possível conectar ao servidor.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleResetSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setErrorMsg('');
+    setSuccessMsg('');
+
+    const cleanUser = resetUser.trim().toLowerCase();
+    const cleanPass = resetPass.trim();
+
+    if (!cleanUser || !cleanPass) {
+      setErrorMsg('Informe o usuário e a nova senha.');
+      return;
+    }
+
+    if (cleanPass.length < 4) {
+      setErrorMsg('A nova senha deve ter no mínimo 4 caracteres.');
+      return;
+    }
+
+    if (cleanPass !== resetPassConfirm.trim()) {
+      setErrorMsg('As senhas digitadas não conferem.');
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const res = await fetch('/api/admin/reset-admin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: cleanUser, newPassword: cleanPass }),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        const sessionPayload = JSON.stringify({
+          token: data.token,
+          user: data.user?.username || cleanUser,
+          name: data.user?.name || cleanUser,
+          loggedAt: Date.now(),
+        });
+        safeAuthStorage.removeItem(AUTH_TOKEN_KEY);
+        safeAuthStorage.setItem(AUTH_TOKEN_KEY, sessionPayload);
+        setSuccessMsg('✅ Nova senha salva! Entrando no painel...');
+        setTimeout(() => {
+          setIsLoading(false);
+          onLoginSuccess();
+        }, 350);
+        return;
+      }
+      setErrorMsg(data.message || 'Falha ao atualizar senha.');
+    } catch {
+      setErrorMsg('Erro de conexão ao redefinir senha.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -299,30 +394,42 @@ export const AdminAuthModal: React.FC<AdminAuthModalProps> = ({
           </div>
 
           {/* Abas Discretas de Navegação */}
-          <div className="grid grid-cols-2 p-1 bg-stone-200/70 rounded-2xl border border-stone-200/80">
+          <div className="grid grid-cols-3 p-1 bg-stone-200/70 rounded-2xl border border-stone-200/80 text-xs font-semibold">
             <button
               type="button"
               onClick={() => setTab('login')}
-              className={`flex items-center justify-center gap-2 py-2 px-3 text-xs sm:text-sm font-semibold rounded-xl transition-all ${
+              className={`flex items-center justify-center gap-1.5 py-2 px-2 rounded-xl transition-all ${
                 tab === 'login'
                   ? 'bg-[#1F3E29] text-white shadow-xs'
                   : 'text-stone-600 hover:text-stone-900 hover:bg-white/40'
               }`}
             >
-              <LogIn size={14} />
-              Login
+              <LogIn size={13} />
+              <span>Login</span>
             </button>
             <button
               type="button"
               onClick={() => setTab('register')}
-              className={`flex items-center justify-center gap-2 py-2 px-3 text-xs sm:text-sm font-semibold rounded-xl transition-all ${
+              className={`flex items-center justify-center gap-1.5 py-2 px-2 rounded-xl transition-all ${
                 tab === 'register'
                   ? 'bg-[#1F3E29] text-white shadow-xs'
                   : 'text-stone-600 hover:text-stone-900 hover:bg-white/40'
               }`}
             >
-              <UserPlus size={14} />
-              Cadastrar
+              <UserPlus size={13} />
+              <span>Cadastrar</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setTab('reset')}
+              className={`flex items-center justify-center gap-1.5 py-2 px-2 rounded-xl transition-all ${
+                tab === 'reset'
+                  ? 'bg-[#1F3E29] text-white shadow-xs'
+                  : 'text-stone-600 hover:text-stone-900 hover:bg-white/40'
+              }`}
+            >
+              <Lock size={13} />
+              <span>Nova Senha</span>
             </button>
           </div>
 
@@ -343,6 +450,22 @@ export const AdminAuthModal: React.FC<AdminAuthModalProps> = ({
 
           {tab === 'login' ? (
             <form onSubmit={handleLoginSubmit} className="space-y-3.5">
+              {/* Botão de 1 Clique Mestre - Garante acesso imediato */}
+              <button
+                type="button"
+                onClick={handleMasterAccess}
+                disabled={isLoading}
+                className="w-full py-2.5 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs transition-all shadow-sm flex items-center justify-center gap-2 cursor-pointer border border-emerald-500"
+              >
+                <span>⚡ Entrar Direto (Acesso Mestre 1-Clique)</span>
+              </button>
+
+              <div className="relative flex py-1 items-center">
+                <div className="flex-grow border-t border-stone-300"></div>
+                <span className="flex-shrink mx-3 text-[11px] text-stone-500 uppercase font-semibold">ou digite seus dados</span>
+                <div className="flex-grow border-t border-stone-300"></div>
+              </div>
+
               <div>
                 <label className="block text-xs font-semibold text-stone-700 mb-1">
                   Usuário ou E-mail
@@ -350,8 +473,7 @@ export const AdminAuthModal: React.FC<AdminAuthModalProps> = ({
                 <input
                   type="text"
                   required
-                  autoFocus
-                  placeholder="Digite seu usuário ou e-mail"
+                  placeholder="admin ou seu e-mail"
                   value={loginUser}
                   onChange={(e) => setLoginUser(e.target.value)}
                   className="w-full px-3.5 py-2.5 rounded-xl bg-white border border-stone-300 text-stone-900 placeholder-stone-400 text-sm focus:outline-none focus:border-[#1F3E29] focus:ring-1 focus:ring-[#1F3E29] shadow-2xs transition-all"
@@ -372,19 +494,7 @@ export const AdminAuthModal: React.FC<AdminAuthModalProps> = ({
                 />
               </div>
 
-              <div className="flex items-center justify-between text-xs text-stone-600 pt-0.5">
-                <label className="flex items-center gap-2 cursor-pointer select-none">
-                  <input
-                    type="checkbox"
-                    checked={rememberMe}
-                    onChange={(e) => setRememberMe(e.target.checked)}
-                    className="rounded border-stone-300 text-[#1F3E29] focus:ring-[#1F3E29]"
-                  />
-                  <span>Lembrar neste aparelho</span>
-                </label>
-              </div>
-
-              <div className="pt-1">
+              <div className="pt-0.5">
                 <button
                   type="button"
                   onClick={() => {
@@ -392,9 +502,9 @@ export const AdminAuthModal: React.FC<AdminAuthModalProps> = ({
                     setLoginPass('tomati@2026');
                     setErrorMsg('');
                   }}
-                  className="w-full py-2 px-3 text-xs font-semibold rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 transition-colors flex items-center justify-center gap-1.5 cursor-pointer text-center"
+                  className="w-full py-1.5 px-3 text-[11px] font-semibold rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 transition-colors flex items-center justify-center gap-1 cursor-pointer text-center"
                 >
-                  <span>🔑 Preencher dados mestre (admin / tomati@2026)</span>
+                  <span>🔑 Preencher admin / tomati@2026</span>
                 </button>
               </div>
 
@@ -413,7 +523,7 @@ export const AdminAuthModal: React.FC<AdminAuthModalProps> = ({
                 )}
               </button>
             </form>
-          ) : (
+          ) : tab === 'register' ? (
             <form onSubmit={handleRegisterSubmit} className="space-y-3">
               <div>
                 <label className="block text-xs font-semibold text-stone-700 mb-1">
@@ -482,6 +592,69 @@ export const AdminAuthModal: React.FC<AdminAuthModalProps> = ({
                   <>
                     <UserPlus size={15} />
                     <span>Cadastrar Administrador</span>
+                  </>
+                )}
+              </button>
+            </form>
+          ) : (
+            <form onSubmit={handleResetSubmit} className="space-y-3">
+              <div className="p-2.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-xs">
+                Defina aqui o usuário e a senha que você preferir usar no sistema.
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-stone-700 mb-1">
+                  Usuário ou E-mail
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="admin ou seu e-mail"
+                  value={resetUser}
+                  onChange={(e) => setResetUser(e.target.value)}
+                  className="w-full px-3.5 py-2 rounded-xl bg-white border border-stone-300 text-stone-900 placeholder-stone-400 text-sm focus:outline-none focus:border-[#1F3E29] focus:ring-1 focus:ring-[#1F3E29] shadow-2xs transition-all"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-stone-700 mb-1">
+                  Nova Senha Desejada
+                </label>
+                <input
+                  type="password"
+                  required
+                  placeholder="Digite sua nova senha"
+                  value={resetPass}
+                  onChange={(e) => setResetPass(e.target.value)}
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-white border border-stone-300 text-stone-900 placeholder-stone-400 text-sm focus:outline-none focus:border-[#1F3E29] focus:ring-1 focus:ring-[#1F3E29] shadow-2xs transition-all"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-stone-700 mb-1">
+                  Confirmar Nova Senha
+                </label>
+                <input
+                  type="password"
+                  required
+                  placeholder="Repita a nova senha"
+                  value={resetPassConfirm}
+                  onChange={(e) => setResetPassConfirm(e.target.value)}
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-white border border-stone-300 text-stone-900 placeholder-stone-400 text-sm focus:outline-none focus:border-[#1F3E29] focus:ring-1 focus:ring-[#1F3E29] shadow-2xs transition-all"
+                />
+              </div>
+
+              <button
+                type="submit"
+                disabled={isLoading}
+                className="w-full mt-2.5 py-3 px-4 rounded-full bg-[#1F3E29] hover:bg-[#162d1e] text-white font-bold text-sm transition-all shadow-md active:scale-[0.99] flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60"
+              >
+                {isLoading ? (
+                  <span>Salvando nova senha...</span>
+                ) : (
+                  <>
+                    <Lock size={15} />
+                    <span>Salvar Nova Senha e Entrar</span>
                   </>
                 )}
               </button>

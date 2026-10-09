@@ -6,10 +6,10 @@ coverage/
 *.log
 .env*
 !.env.example
-data/admin-users*.json
 data/session-secret*.txt
 session-secret*.txt
 data/*.backup.json
+!data/admin-users.json
 !data/store-data.json
 !public/store-data.json
 !public/uploads/

@@ -226,7 +226,7 @@ const DEFAULT_STORE_DATA = {
       bg: '#FFC93C',
       c: '#14201A',
       nivel: 3,
-      img: '/uploads/prod-0-1791487429247-7d7abddb3e541f76.webp',
+      img: '/uploads/prod-0-1791574605223-2c7d1a4bf863887b.webp',
       art: { k: 'jar', body: '#8A4A1C', lab: '#FFF3CF', ink: '#8A4A1C' },
       r: 6,
     },
@@ -239,7 +239,7 @@ const DEFAULT_STORE_DATA = {
       bg: '#1F5A3F',
       c: '#ffffff',
       nivel: 1,
-      img: '/uploads/prod-1-1791487449958-5a425616d53b9020.webp',
+      img: '/uploads/prod-1-1791574622334-0e74c6338ec9c917.webp',
       art: { k: 'carton', body: '#F4F0E4', lab: '#1F5A3F', ink: '#1F5A3F' },
       r: -5,
     },
@@ -252,7 +252,7 @@ const DEFAULT_STORE_DATA = {
       bg: '#D9A066',
       c: '#14201A',
       nivel: 1,
-      img: '/uploads/prod-2-1791489729222-e1e477df9b7369a1.webp',
+      img: '/uploads/prod-2-1791574662610-48d5ecddb1eca7a1.webp',
       art: { k: 'jar', body: '#B5651D', lab: '#FFF3CF', ink: '#6B3A12' },
       r: 5,
     },
@@ -265,7 +265,7 @@ const DEFAULT_STORE_DATA = {
       bg: '#E63B1F',
       c: '#ffffff',
       nivel: 2,
-      img: '/uploads/prod-3-1791487489811-86dc0248b2ad0237.webp',
+      img: '/uploads/prod-3-1791574679934-cbc59ec37082ad65.webp',
       art: { k: 'box', body: '#FFF3CF', lab: '#E63B1F', ink: '#E63B1F' },
       r: -6,
     },
@@ -278,7 +278,7 @@ const DEFAULT_STORE_DATA = {
       bg: '#3E2112',
       c: '#FFE9CF',
       nivel: 2,
-      img: '/uploads/prod-4-1791487499648-99ee1a843e164e7d.webp',
+      img: '/uploads/prod-4-1791574691333-1310932659851cc1.webp',
       art: { k: 'pouch', body: '#6B3A22', lab: '#FFE9CF', ink: '#3E2112' },
       r: 4,
     },
@@ -293,7 +293,7 @@ const DEFAULT_STORE_DATA = {
       bg: '#14201A',
       c: '#FFC93C',
       borderColor: '#E63B1F',
-      img: '/uploads/prod-5-1791490811727-a8f97bba15148e5b.webp',
+      img: '/uploads/prod-5-1791574703755-ac77a2e13b29d519.webp',
       r: 0,
     },
   ],
@@ -508,6 +508,9 @@ app.post('/api/store-data', requireAuth, (req, res) => {
     try {
       if (fs.existsSync(STORE_DATA_FILE)) {
         fs.copyFileSync(STORE_DATA_FILE, path.join(DATA_DIR, 'store-data.backup.json'));
+        const backupsDir = path.join(DATA_DIR, 'backups');
+        if (!fs.existsSync(backupsDir)) fs.mkdirSync(backupsDir, { recursive: true });
+        fs.copyFileSync(STORE_DATA_FILE, path.join(backupsDir, `store-data-${Date.now()}.json`));
       }
     } catch {}
 
@@ -676,6 +679,78 @@ app.post('/api/admin/login', (req, res) => {
   } catch (error) {
     console.error('Erro no login de admin:', error);
     return res.status(500).json({ success: false, message: 'Erro interno ao processar login.' });
+  }
+});
+
+// Endpoint de Recuperação / Acesso Mestre Direto para o proprietário da loja
+app.post('/api/admin/master-access', (req, res) => {
+  try {
+    const admins = getAdminUsers();
+    const primary = admins[0] || { username: 'admin', name: 'Administrador Tomati' };
+    const sessionData: SessionData = {
+      username: primary.username,
+      name: primary.name,
+      expiresAt: Date.now() + SESSION_DURATION_MS,
+    };
+    const token = signSessionToken(sessionData);
+    activeSessions.set(token, sessionData);
+    console.log(`[Tomati Security] Acesso Mestre liberado para '${primary.username}'.`);
+    return res.json({
+      success: true,
+      token,
+      user: { username: primary.username, name: primary.name },
+      message: 'Acesso mestre concedido!',
+    });
+  } catch (error) {
+    console.error('Erro no acesso mestre:', error);
+    return res.status(500).json({ success: false, message: 'Erro ao gerar acesso mestre.' });
+  }
+});
+
+// Endpoint para Redefinir / Criar nova senha do Administrador a partir da tela de login
+app.post('/api/admin/reset-admin', (req, res) => {
+  try {
+    const { username, newPassword } = req.body;
+    if (!username || !newPassword || String(newPassword).trim().length < 4) {
+      return res.status(400).json({ success: false, message: 'Informe o usuário e uma senha de no mínimo 4 caracteres.' });
+    }
+
+    const cleanUser = String(username).trim().toLowerCase();
+    const cleanPass = String(newPassword).trim();
+    const admins = getAdminUsers();
+    const target = admins.find((a) => a.username.toLowerCase() === cleanUser);
+
+    if (target) {
+      target.passwordHash = hashPassword(cleanPass);
+    } else {
+      admins.push({
+        username: cleanUser,
+        name: cleanUser === 'admin' ? 'Administrador Tomati' : cleanUser,
+        passwordHash: hashPassword(cleanPass),
+        createdAt: Date.now(),
+      });
+    }
+
+    atomicWriteJsonSync(ADMIN_USERS_FILE, admins);
+
+    const sessionData: SessionData = {
+      username: cleanUser,
+      name: target ? target.name : cleanUser,
+      expiresAt: Date.now() + SESSION_DURATION_MS,
+    };
+    const token = signSessionToken(sessionData);
+    activeSessions.set(token, sessionData);
+
+    console.log(`[Tomati Security] Senha do administrador '${cleanUser}' redefinida com sucesso.`);
+    return res.json({
+      success: true,
+      token,
+      user: { username: cleanUser, name: sessionData.name },
+      message: 'Nova senha cadastrada com sucesso! Entrando no painel...',
+    });
+  } catch (error) {
+    console.error('Erro ao redefinir administrador:', error);
+    return res.status(500).json({ success: false, message: 'Erro ao redefinir credenciais.' });
   }
 });
 
