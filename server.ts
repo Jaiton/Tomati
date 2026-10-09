@@ -682,31 +682,6 @@ app.post('/api/admin/login', (req, res) => {
   }
 });
 
-// Endpoint de Recuperação / Acesso Mestre Direto para o proprietário da loja
-app.post('/api/admin/master-access', (req, res) => {
-  try {
-    const admins = getAdminUsers();
-    const primary = admins[0] || { username: 'admin', name: 'Administrador Tomati' };
-    const sessionData: SessionData = {
-      username: primary.username,
-      name: primary.name,
-      expiresAt: Date.now() + SESSION_DURATION_MS,
-    };
-    const token = signSessionToken(sessionData);
-    activeSessions.set(token, sessionData);
-    console.log(`[Tomati Security] Acesso Mestre liberado para '${primary.username}'.`);
-    return res.json({
-      success: true,
-      token,
-      user: { username: primary.username, name: primary.name },
-      message: 'Acesso mestre concedido!',
-    });
-  } catch (error) {
-    console.error('Erro no acesso mestre:', error);
-    return res.status(500).json({ success: false, message: 'Erro ao gerar acesso mestre.' });
-  }
-});
-
 // Endpoint para Redefinir / Criar nova senha do Administrador a partir da tela de login
 app.post('/api/admin/reset-admin', (req, res) => {
   try {
