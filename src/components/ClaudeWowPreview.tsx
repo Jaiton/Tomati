@@ -495,29 +495,31 @@ export const ClaudeWowPreview: React.FC<any> = () => {
         body: JSON.stringify({ data: base64Data, prefix }),
       });
       if (res.ok) {
-        const json = await res.json();
-        if (json.url) return json.url;
+        const contentType = res.headers.get('content-type') || '';
+        if (contentType.includes('application/json')) {
+          const json = await res.json();
+          if (json.url) return json.url;
+        }
+        throw new Error('Servidor retornou resposta inesperada ao enviar arquivo.');
       } else if (res.status === 401) {
         setAdminMsg('⚠️ Sessão de administrador expirada. Faça login novamente.');
         setIsAdminAuthenticated(false);
         setIsAuthModalOpen(true);
+        throw new Error('Sessão expirada.');
       } else {
         const errJson = await res.json().catch(() => null);
-        if (errJson?.error) setAdminMsg(`⚠️ ${errJson.error}`);
+        const msg = errJson?.error || 'Erro ao fazer upload no servidor.';
+        setAdminMsg(`⚠️ ${msg}`);
+        throw new Error(msg);
       }
-    } catch (err) {
+    } catch (err: any) {
       console.warn('Falha no upload para o servidor:', err);
+      throw err;
     }
-    return base64Data;
   };
 
   // Salvar no estado, no localStorage e persistir no servidor (retorna Promise<boolean> para confirmação real)
   const persistData = async (updated: typeof D): Promise<boolean> => {
-    setData(updated);
-    try {
-      localStorage.setItem(K, JSON.stringify(updated));
-    } catch {}
-
     const token = getAdminAuthToken();
     if (!token) {
       setSyncStatus('erro');
@@ -538,12 +540,29 @@ export const ClaudeWowPreview: React.FC<any> = () => {
         body: JSON.stringify(updated),
       });
       if (res.ok) {
-        setSyncStatus('online');
-        setHasUnsavedChanges(false);
-        const now = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-        setLastSavedTime(now);
-        setAdminMsg(`✅ Salvo com sucesso no servidor às ${now}! Online para todos.`);
-        return true;
+        const contentType = res.headers.get('content-type') || '';
+        if (!contentType.includes('application/json')) {
+          setSyncStatus('erro');
+          setAdminMsg('⚠️ O servidor retornou uma página inesperada. Em hospedagem estática (Vercel), publique novamente o build com os arquivos.');
+          return false;
+        }
+        const json = await res.json();
+        if (json && json.success) {
+          setData(updated);
+          try {
+            localStorage.setItem(K, JSON.stringify(updated));
+          } catch {}
+          setSyncStatus('online');
+          setHasUnsavedChanges(false);
+          const now = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+          setLastSavedTime(now);
+          setAdminMsg(`✅ Salvo com sucesso no servidor às ${now}! Online para todos.`);
+          return true;
+        } else {
+          setSyncStatus('erro');
+          setAdminMsg(`⚠️ Erro ao salvar: ${json?.error || 'Falha no servidor'}`);
+          return false;
+        }
       } else if (res.status === 401) {
         setSyncStatus('erro');
         setAdminMsg('⚠️ Sessão de administrador expirada. Faça login novamente.');
@@ -665,33 +684,37 @@ export const ClaudeWowPreview: React.FC<any> = () => {
 
     if (isProduct !== undefined) {
       compressImage(file, 900, 'image/webp', async (base64) => {
-        const serverUrl = await uploadImageToServer(base64, `prod-${isProduct}`);
-        const current = dataRef.current || data;
-        const next = clone(current);
-        if (next.produtos && next.produtos[isProduct]) {
-          next.produtos[isProduct].img = serverUrl;
-          const ok = await persistData(next);
-          if (ok) {
-            setAdminMsg('Foto do produto salva e publicada com sucesso!');
-          } else {
-            setAdminMsg('⚠️ Foto carregada, mas houve erro ao salvar no servidor.');
+        try {
+          const serverUrl = await uploadImageToServer(base64, `prod-${isProduct}`);
+          const current = dataRef.current || data;
+          const next = clone(current);
+          if (next.produtos && next.produtos[isProduct]) {
+            next.produtos[isProduct].img = serverUrl;
+            const ok = await persistData(next);
+            if (ok) {
+              setAdminMsg('Foto do produto salva e publicada com sucesso!');
+            }
           }
+        } catch (err: any) {
+          setAdminMsg(`⚠️ ${err?.message || 'Falha ao salvar foto do produto.'}`);
         }
       });
     } else {
       const maxW = fieldKey === 'logo' ? 600 : fieldKey === 'hero_banner' ? 1600 : 128;
       const mime = fieldKey === 'hero_banner' ? 'image/webp' : 'image/png';
       compressImage(file, maxW, mime, async (base64) => {
-        const serverUrl = await uploadImageToServer(base64, `brand-${fieldKey}`);
-        const current = dataRef.current || data;
-        const next = clone(current);
-        if (!next.img) next.img = { logo: '', favicon: '', hero_banner: '' };
-        (next.img as any)[fieldKey] = serverUrl;
-        const ok = await persistData(next);
-        if (ok) {
-          setAdminMsg('Imagem salva e publicada com sucesso!');
-        } else {
-          setAdminMsg('⚠️ Imagem carregada, mas houve erro ao salvar no servidor.');
+        try {
+          const serverUrl = await uploadImageToServer(base64, `brand-${fieldKey}`);
+          const current = dataRef.current || data;
+          const next = clone(current);
+          if (!next.img) next.img = { logo: '', favicon: '', hero_banner: '' };
+          (next.img as any)[fieldKey] = serverUrl;
+          const ok = await persistData(next);
+          if (ok) {
+            setAdminMsg('Imagem salva e publicada com sucesso!');
+          }
+        } catch (err: any) {
+          setAdminMsg(`⚠️ ${err?.message || 'Falha ao salvar imagem.'}`);
         }
       });
     }
@@ -1084,6 +1107,17 @@ export const ClaudeWowPreview: React.FC<any> = () => {
                     className={`blk ${spanClass}${isCamp ? ' camp' : ''}${isBannerStyle ? ' has-banner' : ''}`}
                     style={blockStyle}
                   >
+                    {isBannerStyle && p.img && (
+                      <img
+                        src={resolveImageUrl(p.img)}
+                        alt=""
+                        aria-hidden="true"
+                        style={{ display: 'none' }}
+                        onError={() => {
+                          setFailedImages((prev) => ({ ...prev, [p.img]: true }));
+                        }}
+                      />
+                    )}
                     <div className="big" style={isBannerStyle ? { color: p.c || '#ffffff', textShadow: '0 2px 10px rgba(0,0,0,0.6)' } : undefined}>
                       {p.nome}
                     </div>

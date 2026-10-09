@@ -31,8 +31,11 @@ if (!fs.existsSync(UPLOADS_DIR)) {
   fs.mkdirSync(UPLOADS_DIR, { recursive: true });
 }
 
-// Servir arquivos de upload estaticamente
+// Servir arquivos de upload estaticamente (e retornar 404 se o arquivo não existir)
 app.use('/uploads', express.static(UPLOADS_DIR));
+app.use('/uploads', (_req, res) => {
+  res.status(404).type('text/plain').send('Arquivo não encontrado em /uploads');
+});
 
 // Gerenciamento de Sessões em Memória (Tokens Criptográficos)
 interface SessionData {
@@ -124,8 +127,8 @@ const DEFAULT_STORE_DATA = {
     tiktok: '@tomatibrasil',
   },
   img: {
-    logo: '/uploads/brand-logo-1791487284490-4c8cc840fb27055f.png',
-    favicon: '/uploads/brand-favicon-1791487298420-3e2e18722687098a.png',
+    logo: '/brand-logo.png',
+    favicon: '/favicon.ico',
   },
   menu: [
     { id: '1', title: 'na vitrine', url: '#produtos' },
@@ -623,20 +626,19 @@ app.post('/api/admin/change-password', requireAuth, (req, res) => {
 app.get('/api/admin/setup-status', (_req, res) => {
   try {
     const admins = getAdminUsers();
-    const hasCustomAdmin = admins.some((a) => a.username.toLowerCase() !== 'admin');
-    return res.json({ canRegister: !hasCustomAdmin, hasCustomAdmin });
+    const canRegister = admins.length === 0;
+    return res.json({ canRegister, hasCustomAdmin: admins.length > 0 });
   } catch {
     return res.json({ canRegister: false, hasCustomAdmin: true });
   }
 });
 
-// Endpoint: Criar Administrador (permite primeiro administrador customizado ou requer autenticação)
+// Endpoint: Criar Administrador (requer autenticação de administrador existente se já houver contas)
 app.post('/api/admin/register', (req, res) => {
   try {
     const admins = getAdminUsers();
-    const hasCustomAdmin = admins.some((a) => a.username.toLowerCase() !== 'admin');
 
-    // Verifica autenticação se já houver um administrador customizado configurado
+    // Se já existem administradores cadastrados, exige autenticação obrigatória
     const authHeader = req.headers.authorization;
     let isAuthenticated = false;
     let requestingUser = 'setup-inicial';
@@ -650,7 +652,7 @@ app.post('/api/admin/register', (req, res) => {
       }
     }
 
-    if (hasCustomAdmin && !isAuthenticated) {
+    if (admins.length > 0 && !isAuthenticated) {
       return res.status(401).json({
         success: false,
         message: 'Acesso restrito. Novos administradores só podem ser cadastrados por um administrador conectado.',

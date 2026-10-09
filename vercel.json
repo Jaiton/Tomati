@@ -5,7 +5,7 @@
       "destination": "/store-data.json"
     },
     {
-      "source": "/(.*)",
+      "source": "/((?!uploads/|api/|.*\\.[\\w]+$).*)",
       "destination": "/"
     }
   ]
