@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { TomatiLogo } from './TomatiLogo';
-import { AdminAuthModal } from './AdminAuthModal';
+import { AdminAuthModal, safeAuthStorage } from './AdminAuthModal';
 import { PWAInstallModal } from './PWAInstallModal';
 import { Smartphone } from 'lucide-react';
 import { DEFAULT_LOGO_BASE64, getFallbackProductImage } from '../assets';
@@ -284,7 +284,7 @@ function compressImage(file: File, maxWidth: number, mimeType: string, callback:
 // Obter token de autenticação seguro da sessão
 function getAdminAuthToken(): string {
   try {
-    const raw = localStorage.getItem('tomati_admin_session_v1') || sessionStorage.getItem('tomati_admin_session_v1');
+    const raw = safeAuthStorage.getItem('tomati_admin_session_v1');
     if (raw) {
       const parsed = JSON.parse(raw);
       return parsed.token || '';
@@ -294,12 +294,22 @@ function getAdminAuthToken(): string {
 }
 
 export const ClaudeWowPreview: React.FC<any> = () => {
-  // Estado local sincronizado com localStorage
+  // Estado local sincronizado com safeAuthStorage e protegendo imagens
   const [data, setData] = useState<typeof D>(() => {
     try {
-      const saved = localStorage.getItem(K);
+      const saved = safeAuthStorage.getItem(K);
       if (saved) {
         const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed.produtos) && parsed.produtos.length > 0) {
+          // Garante que cada produto mantenha sua imagem oficial e não fique em branco
+          parsed.produtos = parsed.produtos.map((p: any, idx: number) => {
+            const defaultProd = D.produtos[idx];
+            if (!p.img && defaultProd?.img) {
+              return { ...p, img: defaultProd.img };
+            }
+            return p;
+          });
+        }
         if (Array.isArray(parsed.menu)) {
           parsed.menu = parsed.menu.map((m: any) => {
             if (m?.title && (m.title.toLowerCase() === 'onde encontrar' || m.title.toLowerCase() === 'onde pedir')) {
@@ -393,8 +403,7 @@ export const ClaudeWowPreview: React.FC<any> = () => {
         setIsAdminOpen(true);
         loadAdminUsers();
       } else {
-        localStorage.removeItem('tomati_admin_session_v1');
-        sessionStorage.removeItem('tomati_admin_session_v1');
+        safeAuthStorage.removeItem('tomati_admin_session_v1');
         setIsAdminAuthenticated(false);
         setIsAuthModalOpen(true);
       }
@@ -413,8 +422,7 @@ export const ClaudeWowPreview: React.FC<any> = () => {
           headers: { Authorization: `Bearer ${token}` },
         }).catch(() => {});
       }
-      localStorage.removeItem('tomati_admin_session_v1');
-      sessionStorage.removeItem('tomati_admin_session_v1');
+      safeAuthStorage.removeItem('tomati_admin_session_v1');
     } catch {}
     setIsAdminAuthenticated(false);
     setIsAdminOpen(false);
@@ -448,9 +456,18 @@ export const ClaudeWowPreview: React.FC<any> = () => {
             if (serverData && Array.isArray(serverData.produtos)) {
               if (!isMounted) return;
               const cleaned = cleanMenuData(serverData);
+              if (Array.isArray(cleaned.produtos)) {
+                cleaned.produtos = cleaned.produtos.map((p: any, idx: number) => {
+                  const defaultProd = D.produtos[idx];
+                  if (!p.img && defaultProd?.img) {
+                    return { ...p, img: defaultProd.img };
+                  }
+                  return p;
+                });
+              }
               setData(cleaned);
               setSyncStatus('online');
-              try { localStorage.setItem(K, JSON.stringify(cleaned)); } catch {}
+              try { safeAuthStorage.setItem(K, JSON.stringify(cleaned)); } catch {}
               return;
             }
           }
@@ -469,9 +486,18 @@ export const ClaudeWowPreview: React.FC<any> = () => {
             if (staticData && Array.isArray(staticData.produtos)) {
               if (!isMounted) return;
               const cleaned = cleanMenuData(staticData);
+              if (Array.isArray(cleaned.produtos)) {
+                cleaned.produtos = cleaned.produtos.map((p: any, idx: number) => {
+                  const defaultProd = D.produtos[idx];
+                  if (!p.img && defaultProd?.img) {
+                    return { ...p, img: defaultProd.img };
+                  }
+                  return p;
+                });
+              }
               setData(cleaned);
               setSyncStatus('online');
-              try { localStorage.setItem(K, JSON.stringify(cleaned)); } catch {}
+              try { safeAuthStorage.setItem(K, JSON.stringify(cleaned)); } catch {}
               return;
             }
           }

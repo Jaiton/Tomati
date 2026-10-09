@@ -9,7 +9,40 @@ interface AdminAuthModalProps {
   logoUrl?: string;
 }
 
-const AUTH_TOKEN_KEY = 'tomati_admin_session_v1';
+export const AUTH_TOKEN_KEY = 'tomati_admin_session_v1';
+
+const memoryAuthStore = new Map<string, string>();
+export const safeAuthStorage = {
+  getItem: (key: string): string | null => {
+    try {
+      const v = window.localStorage.getItem(key);
+      if (v !== null) return v;
+    } catch {}
+    try {
+      const v = window.sessionStorage.getItem(key);
+      if (v !== null) return v;
+    } catch {}
+    return memoryAuthStore.get(key) ?? null;
+  },
+  setItem: (key: string, value: string) => {
+    memoryAuthStore.set(key, value);
+    try {
+      window.localStorage.setItem(key, value);
+    } catch {}
+    try {
+      window.sessionStorage.setItem(key, value);
+    } catch {}
+  },
+  removeItem: (key: string) => {
+    memoryAuthStore.delete(key);
+    try {
+      window.localStorage.removeItem(key);
+    } catch {}
+    try {
+      window.sessionStorage.removeItem(key);
+    } catch {}
+  },
+};
 
 export const AdminAuthModal: React.FC<AdminAuthModalProps> = ({
   isOpen,
@@ -103,21 +136,15 @@ export const AdminAuthModal: React.FC<AdminAuthModalProps> = ({
           loggedAt: Date.now(),
         });
 
-        // Limpa previamente ambos os armazenamentos para evitar conflito de tokens antigos
-        localStorage.removeItem(AUTH_TOKEN_KEY);
-        sessionStorage.removeItem(AUTH_TOKEN_KEY);
-
-        if (rememberMe) {
-          localStorage.setItem(AUTH_TOKEN_KEY, sessionPayload);
-        } else {
-          sessionStorage.setItem(AUTH_TOKEN_KEY, sessionPayload);
-        }
+        // Grava sessão de forma segura (funciona mesmo com restrições de iframe/cookies)
+        safeAuthStorage.removeItem(AUTH_TOKEN_KEY);
+        safeAuthStorage.setItem(AUTH_TOKEN_KEY, sessionPayload);
 
         setSuccessMsg('Autenticado com sucesso! Entrando no painel...');
         setTimeout(() => {
           setIsLoading(false);
           onLoginSuccess();
-        }, 350);
+        }, 300);
         return;
       }
 
@@ -158,7 +185,7 @@ export const AdminAuthModal: React.FC<AdminAuthModalProps> = ({
       // Obter token de sessão ativa (apenas admins logados podem criar outros admins)
       let activeToken = '';
       try {
-        const raw = localStorage.getItem(AUTH_TOKEN_KEY) || sessionStorage.getItem(AUTH_TOKEN_KEY);
+        const raw = safeAuthStorage.getItem(AUTH_TOKEN_KEY);
         if (raw) {
           const parsed = JSON.parse(raw);
           activeToken = parsed.token || '';
@@ -186,12 +213,12 @@ export const AdminAuthModal: React.FC<AdminAuthModalProps> = ({
             name: data.user?.name || cleanName,
             loggedAt: Date.now(),
           });
-          localStorage.setItem(AUTH_TOKEN_KEY, sessionPayload);
+          safeAuthStorage.setItem(AUTH_TOKEN_KEY, sessionPayload);
           setSuccessMsg('✅ Administrador cadastrado com sucesso! Entrando no painel...');
           setTimeout(() => {
             setIsLoading(false);
             onLoginSuccess();
-          }, 450);
+          }, 350);
           return;
         }
 
@@ -357,6 +384,20 @@ export const AdminAuthModal: React.FC<AdminAuthModalProps> = ({
                 </label>
               </div>
 
+              <div className="pt-1">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setLoginUser('admin');
+                    setLoginPass('tomati@2026');
+                    setErrorMsg('');
+                  }}
+                  className="w-full py-2 px-3 text-xs font-semibold rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 transition-colors flex items-center justify-center gap-1.5 cursor-pointer text-center"
+                >
+                  <span>🔑 Preencher dados mestre (admin / tomati@2026)</span>
+                </button>
+              </div>
+
               <button
                 type="submit"
                 disabled={isLoading}
@@ -371,12 +412,6 @@ export const AdminAuthModal: React.FC<AdminAuthModalProps> = ({
                   </>
                 )}
               </button>
-
-              <div className="mt-2.5 p-2.5 rounded-xl bg-stone-100 border border-stone-200/80 text-[11px] text-stone-600 space-y-0.5">
-                <span className="font-semibold text-stone-700 block">Primeiro acesso ao painel:</span>
-                <div>Usuário: <code className="bg-stone-200 px-1 py-0.5 rounded text-stone-800 font-mono">admin</code> | Senha: <code className="bg-stone-200 px-1 py-0.5 rounded text-stone-800 font-mono">tomati@2026</code></div>
-                <div className="text-[10px] text-stone-500 pt-0.5">Você pode alterar sua senha após entrar no painel da loja.</div>
-              </div>
             </form>
           ) : (
             <form onSubmit={handleRegisterSubmit} className="space-y-3">

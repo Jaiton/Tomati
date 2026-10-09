@@ -7,6 +7,8 @@ coverage/
 .env*
 !.env.example
 data/admin-users*.json
+data/session-secret*.txt
+session-secret*.txt
 data/*.backup.json
 !data/store-data.json
 !public/store-data.json
