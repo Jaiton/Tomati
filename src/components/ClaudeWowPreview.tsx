@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { TomatiLogo } from './TomatiLogo';
 import { AdminAuthModal, safeAuthStorage } from './AdminAuthModal';
 import { PWAInstallModal } from './PWAInstallModal';
+import { PromoBannerModal, DEFAULT_PROMO_BANNER, PromoBannerConfig } from './PromoBannerModal';
 import { Smartphone } from 'lucide-react';
 import { DEFAULT_LOGO_BASE64, getFallbackProductImage } from '../assets';
 
@@ -38,6 +39,7 @@ const D = {
     sobre_x: 'Curadoria de produtos selecionados, com sabor autêntico e entrega rápida em Curitiba.',
     fim_h: 'Bom pra você. Fácil de pedir.',
   },
+  promoBanner: { ...DEFAULT_PROMO_BANNER } as PromoBannerConfig,
   produtos: [
     {
       nome: 'Hey! Mu',
@@ -345,6 +347,9 @@ export const ClaudeWowPreview: React.FC<any> = () => {
   const [confirmDeleteIdx, setConfirmDeleteIdx] = useState<number | null>(null);
   const [confirmReset, setConfirmReset] = useState(false);
   const [isPWAInstallModalOpen, setIsPWAInstallModalOpen] = useState(false);
+  const [isPromoOpen, setIsPromoOpen] = useState(false);
+  const [isPromoPreview, setIsPromoPreview] = useState(false);
+  const promoAutoShownRef = useRef(false);
   const [failedImages, setFailedImages] = useState<Record<string, boolean>>({});
   const [logoError, setLogoError] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -432,16 +437,25 @@ export const ClaudeWowPreview: React.FC<any> = () => {
     setAdminMsg('Sessão de administrador finalizada.');
   };
 
-  // Helper para normalizar itens do menu e evitar sobreposição de textos longos
+  // Helper para normalizar itens do menu e garantir schema de promoBanner
   const cleanMenuData = (inputData: any) => {
-    if (!inputData || !Array.isArray(inputData.menu)) return inputData;
-    const updatedMenu = inputData.menu.map((m: any) => {
-      if (m?.title && (m.title.toLowerCase() === 'onde encontrar' || m.title.toLowerCase() === 'onde pedir')) {
-        return { ...m, title: 'pedir' };
-      }
-      return m;
-    });
-    return { ...inputData, menu: updatedMenu };
+    if (!inputData) return inputData;
+    const updatedMenu = Array.isArray(inputData.menu)
+      ? inputData.menu.map((m: any) => {
+          if (m?.title && (m.title.toLowerCase() === 'onde encontrar' || m.title.toLowerCase() === 'onde pedir')) {
+            return { ...m, title: 'pedir' };
+          }
+          return m;
+        })
+      : inputData.menu;
+    return {
+      ...inputData,
+      menu: updatedMenu,
+      promoBanner: {
+        ...DEFAULT_PROMO_BANNER,
+        ...(inputData.promoBanner && typeof inputData.promoBanner === 'object' ? inputData.promoBanner : {}),
+      },
+    };
   };
 
   // Carregar dados salvos no servidor (ou fallback estático /store-data.json para Vercel / GitHub Pages)
@@ -529,6 +543,48 @@ export const ClaudeWowPreview: React.FC<any> = () => {
       isMounted = false;
     };
   }, []);
+
+  // Exibição automática do Banner Promocional ao carregar os dados da loja
+  useEffect(() => {
+    if (syncStatus === 'carregando' || promoAutoShownRef.current) return;
+    promoAutoShownRef.current = true;
+
+    const promo = data.promoBanner || DEFAULT_PROMO_BANNER;
+    if (!promo.enabled) return;
+    if (isAdminOpen || isAuthModalOpen) return;
+
+    if (promo.frequency === 'session') {
+      try {
+        if (window.sessionStorage.getItem('tomati_promo_dismissed_v1') === '1') {
+          return;
+        }
+      } catch {}
+    }
+
+    const timer = window.setTimeout(() => {
+      setIsPromoPreview(false);
+      setIsPromoOpen(true);
+    }, 350);
+
+    return () => window.clearTimeout(timer);
+  }, [syncStatus, data.promoBanner, isAdminOpen, isAuthModalOpen]);
+
+  const handleClosePromo = () => {
+    setIsPromoOpen(false);
+    if (!isPromoPreview) {
+      try {
+        window.sessionStorage.setItem('tomati_promo_dismissed_v1', '1');
+      } catch {}
+    }
+    setIsPromoPreview(false);
+  };
+
+  const getPromoCtaHref = (): string => {
+    const promo = data.promoBanner || DEFAULT_PROMO_BANNER;
+    if (promo.ctaLinkType === 'ifood') return getUrl('ifood');
+    if (promo.ctaLinkType === 'custom') return promo.ctaCustomUrl?.trim() || getUrl('portal');
+    return getUrl('portal');
+  };
 
   // Upload de arquivo para o servidor (/uploads) com fallback gracioso para data URL em hospedagem estática
   const uploadImageToServer = async (base64Data: string, prefix: string): Promise<string> => {
@@ -754,6 +810,25 @@ export const ClaudeWowPreview: React.FC<any> = () => {
           }
         } catch (err: any) {
           setAdminMsg(`⚠️ ${err?.message || 'Falha ao salvar foto do produto.'}`);
+        }
+      });
+    } else if (fieldKey === 'promo_banner') {
+      compressImage(file, 1400, 'image/webp', async (base64) => {
+        try {
+          const serverUrl = await uploadImageToServer(base64, 'promo-banner');
+          const current = dataRef.current || data;
+          const next = clone(current);
+          next.promoBanner = {
+            ...DEFAULT_PROMO_BANNER,
+            ...(next.promoBanner || {}),
+            image: serverUrl,
+          };
+          const ok = await persistData(next);
+          if (ok) {
+            setAdminMsg('Imagem do banner promocional salva e publicada com sucesso!');
+          }
+        } catch (err: any) {
+          setAdminMsg(`⚠️ ${err?.message || 'Falha ao salvar imagem do banner promocional.'}`);
         }
       });
     } else {
@@ -1529,6 +1604,218 @@ export const ClaudeWowPreview: React.FC<any> = () => {
             )}
           </div>
 
+          {/* Banner Promocional de Entrada (Black Tomati / Ações) */}
+          <h4>Banner de entrada (Campanhas e Ações)</h4>
+          <p>
+            Ative quando quiser exibir uma ação especial ao abrir o site (ex.: Black Tomati, cupom relâmpago, feriados ou lançamentos).
+          </p>
+
+          <div
+            style={{
+              background: 'rgba(255, 255, 255, 0.05)',
+              border: '1px solid rgba(255, 255, 255, 0.14)',
+              borderRadius: '12px',
+              padding: '12px 14px',
+              marginBottom: '16px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '10px',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px' }}>
+              <div>
+                <div style={{ fontSize: '13px', fontWeight: 700, color: '#fff' }}>
+                  Exibir banner ao abrir o site
+                </div>
+                <div style={{ fontSize: '11.5px', opacity: 0.78 }}>
+                  {(data.promoBanner?.enabled ?? DEFAULT_PROMO_BANNER.enabled)
+                    ? 'Ativo — aparece para os visitantes'
+                    : 'Desativado — o site abre direto na vitrine'}
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() =>
+                  handleUpdateField(
+                    'promoBanner.enabled',
+                    !(data.promoBanner?.enabled ?? DEFAULT_PROMO_BANNER.enabled)
+                  )
+                }
+                style={{
+                  padding: '6px 12px',
+                  borderRadius: '999px',
+                  border: 'none',
+                  fontSize: '12px',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  background: (data.promoBanner?.enabled ?? DEFAULT_PROMO_BANNER.enabled) ? '#FFC93C' : 'rgba(255,255,255,0.14)',
+                  color: (data.promoBanner?.enabled ?? DEFAULT_PROMO_BANNER.enabled) ? '#14201A' : '#fff',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {(data.promoBanner?.enabled ?? DEFAULT_PROMO_BANNER.enabled) ? 'Ativado' : 'Desativado'}
+              </button>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => {
+                setIsPromoPreview(true);
+                setIsPromoOpen(true);
+              }}
+              style={{
+                width: '100%',
+                padding: '9px 12px',
+                borderRadius: '9px',
+                background: 'rgba(255, 255, 255, 0.1)',
+                border: '1px solid rgba(255, 255, 255, 0.22)',
+                color: '#fff',
+                fontSize: '12.5px',
+                fontWeight: 600,
+                cursor: 'pointer',
+              }}
+            >
+              Pré-visualizar banner agora
+            </button>
+
+            <label style={{ margin: 0 }}>
+              Imagem da campanha (upload)
+              <input
+                type="file"
+                accept="image/*"
+                onChange={(e) => handleFileUpload(e, 'promo_banner')}
+              />
+            </label>
+
+            <label style={{ margin: 0 }}>
+              Ou link direto da imagem (vazio = foto padrão Black Tomati)
+              <input
+                placeholder="https://... ou /uploads/..."
+                value={data.promoBanner?.image ?? ''}
+                onChange={(e) => handleUpdateField('promoBanner.image', e.target.value)}
+              />
+            </label>
+
+            {data.promoBanner?.image && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(255,255,255,0.06)', padding: '6px 10px', borderRadius: '8px' }}>
+                <img
+                  src={resolveImageUrl(data.promoBanner.image)}
+                  alt="Miniatura do banner"
+                  style={{ height: '34px', width: '56px', objectFit: 'cover', borderRadius: '4px' }}
+                />
+                <span style={{ fontSize: '11px', opacity: 0.85 }}>Imagem personalizada ativa</span>
+                <button
+                  type="button"
+                  onClick={() => handleUpdateField('promoBanner.image', '')}
+                  style={{ marginLeft: 'auto', fontSize: '11px', padding: '3px 8px' }}
+                >
+                  Usar padrão
+                </button>
+              </div>
+            )}
+
+            <label
+              style={{
+                margin: 0,
+                display: 'flex',
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: '8px',
+                cursor: 'pointer',
+                fontSize: '12.5px',
+              }}
+            >
+              <input
+                type="checkbox"
+                checked={Boolean(data.promoBanner?.imageOnly)}
+                onChange={(e) => handleUpdateField('promoBanner.imageOnly', e.target.checked)}
+                style={{ width: '16px', height: '16px', margin: 0 }}
+              />
+              <span>Modo Arte Pronta (exibir somente a imagem clicável)</span>
+            </label>
+
+            {!data.promoBanner?.imageOnly && (
+              <>
+                <label style={{ margin: 0 }}>
+                  Etiqueta / Nome da ação
+                  <input
+                    placeholder="Ex: Black Tomati, Semana do Frete Grátis..."
+                    value={data.promoBanner?.tag ?? DEFAULT_PROMO_BANNER.tag}
+                    onChange={(e) => handleUpdateField('promoBanner.tag', e.target.value)}
+                  />
+                </label>
+                <label style={{ margin: 0 }}>
+                  Título principal do banner
+                  <input
+                    placeholder="Ex: Seleção saudável com condições especiais."
+                    value={data.promoBanner?.title ?? DEFAULT_PROMO_BANNER.title}
+                    onChange={(e) => handleUpdateField('promoBanner.title', e.target.value)}
+                  />
+                </label>
+                <label style={{ margin: 0 }}>
+                  Descrição curta
+                  <textarea
+                    rows={2}
+                    placeholder="Explique rapidamente a campanha..."
+                    value={data.promoBanner?.description ?? DEFAULT_PROMO_BANNER.description}
+                    onChange={(e) => handleUpdateField('promoBanner.description', e.target.value)}
+                  />
+                </label>
+                <label style={{ margin: 0 }}>
+                  Código de cupom (opcional — deixe vazio para ocultar)
+                  <input
+                    placeholder="Ex: BLACKTOMATI"
+                    value={data.promoBanner?.coupon ?? DEFAULT_PROMO_BANNER.coupon}
+                    onChange={(e) => handleUpdateField('promoBanner.coupon', e.target.value)}
+                  />
+                </label>
+              </>
+            )}
+
+            <label style={{ margin: 0 }}>
+              Texto do botão (vazio = oculta botão)
+              <input
+                placeholder="Ex: Ver ofertas no portal"
+                value={data.promoBanner?.ctaText ?? DEFAULT_PROMO_BANNER.ctaText}
+                onChange={(e) => handleUpdateField('promoBanner.ctaText', e.target.value)}
+              />
+            </label>
+
+            <label style={{ margin: 0 }}>
+              Destino ao clicar no banner/botão
+              <select
+                value={data.promoBanner?.ctaLinkType ?? DEFAULT_PROMO_BANNER.ctaLinkType}
+                onChange={(e) => handleUpdateField('promoBanner.ctaLinkType', e.target.value)}
+              >
+                <option value="portal">Portal de compras Tomati</option>
+                <option value="ifood">Loja no iFood</option>
+                <option value="custom">Link personalizado</option>
+              </select>
+            </label>
+
+            {(data.promoBanner?.ctaLinkType ?? 'portal') === 'custom' && (
+              <label style={{ margin: 0 }}>
+                URL personalizada de destino
+                <input
+                  placeholder="https://..."
+                  value={data.promoBanner?.ctaCustomUrl ?? ''}
+                  onChange={(e) => handleUpdateField('promoBanner.ctaCustomUrl', e.target.value)}
+                />
+              </label>
+            )}
+
+            <label style={{ margin: 0 }}>
+              Frequência de exibição
+              <select
+                value={data.promoBanner?.frequency ?? 'session'}
+                onChange={(e) => handleUpdateField('promoBanner.frequency', e.target.value)}
+              >
+                <option value="session">1 vez por visita (recomendado)</option>
+                <option value="always">Sempre ao abrir/atualizar o site</option>
+              </select>
+            </label>
+          </div>
+
           {/* Textos, links e contato */}
           <h4>Textos, links e contato</h4>
           <label>
@@ -2274,6 +2561,16 @@ export const ClaudeWowPreview: React.FC<any> = () => {
       <PWAInstallModal
         isOpen={isPWAInstallModalOpen}
         onClose={() => setIsPWAInstallModalOpen(false)}
+      />
+
+      {/* Modal de Banner Promocional de Entrada (Black Tomati e Ações Configuráveis) */}
+      <PromoBannerModal
+        isOpen={isPromoOpen}
+        onClose={handleClosePromo}
+        config={data.promoBanner || DEFAULT_PROMO_BANNER}
+        resolveImageUrl={resolveImageUrl}
+        ctaHref={getPromoCtaHref()}
+        isPreview={isPromoPreview}
       />
     </div>
   );

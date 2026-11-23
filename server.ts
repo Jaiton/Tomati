@@ -216,6 +216,19 @@ const DEFAULT_STORE_DATA = {
     sobre_x: 'Curadoria de produtos selecionados, com sabor autêntico e entrega rápida em Curitiba.',
     fim_h: 'Bom pra você. Fácil de pedir.',
   },
+  promoBanner: {
+    enabled: true,
+    tag: 'Black Tomati',
+    title: 'Seleção saudável com condições especiais.',
+    description: 'Aproveite descontos exclusivos em marcas selecionadas durante a Black Tomati. Peça no portal ou no iFood.',
+    coupon: 'BLACKTOMATI',
+    ctaText: 'Ver ofertas no portal',
+    ctaLinkType: 'portal',
+    ctaCustomUrl: '',
+    image: '',
+    imageOnly: false,
+    frequency: 'session',
+  },
   produtos: [
     {
       nome: 'Hey! Mu',
@@ -355,6 +368,26 @@ function normalizeStoreData(input: any) {
     img: typeof p?.img === 'string' && (p.img.startsWith('/uploads') || p.img.startsWith('http') || p.img.startsWith('data:image/')) ? p.img : '',
   }));
 
+  const rawPromo = input.promoBanner && typeof input.promoBanner === 'object' ? input.promoBanner : {};
+  const validLinkTypes = ['portal', 'ifood', 'custom'];
+  const sanitizedPromoBanner = {
+    enabled: typeof rawPromo.enabled === 'boolean' ? rawPromo.enabled : DEFAULT_STORE_DATA.promoBanner.enabled,
+    tag: typeof rawPromo.tag === 'string' ? rawPromo.tag : DEFAULT_STORE_DATA.promoBanner.tag,
+    title: typeof rawPromo.title === 'string' ? rawPromo.title : DEFAULT_STORE_DATA.promoBanner.title,
+    description: typeof rawPromo.description === 'string' ? rawPromo.description : DEFAULT_STORE_DATA.promoBanner.description,
+    coupon: typeof rawPromo.coupon === 'string' ? rawPromo.coupon : DEFAULT_STORE_DATA.promoBanner.coupon,
+    ctaText: typeof rawPromo.ctaText === 'string' ? rawPromo.ctaText : DEFAULT_STORE_DATA.promoBanner.ctaText,
+    ctaLinkType: validLinkTypes.includes(rawPromo.ctaLinkType) ? rawPromo.ctaLinkType : DEFAULT_STORE_DATA.promoBanner.ctaLinkType,
+    ctaCustomUrl: typeof rawPromo.ctaCustomUrl === 'string' ? sanitizeUrl(rawPromo.ctaCustomUrl) : '',
+    image:
+      typeof rawPromo.image === 'string' &&
+      (rawPromo.image.startsWith('/uploads') || rawPromo.image.startsWith('http') || rawPromo.image.startsWith('data:image/'))
+        ? rawPromo.image
+        : '',
+    imageOnly: Boolean(rawPromo.imageOnly),
+    frequency: rawPromo.frequency === 'always' ? 'always' : 'session',
+  };
+
   return {
     ...DEFAULT_STORE_DATA,
     ...input,
@@ -366,6 +399,7 @@ function normalizeStoreData(input: any) {
       hero_banner: typeof input.img?.hero_banner === 'string' ? input.img.hero_banner : '',
     },
     t: { ...DEFAULT_STORE_DATA.t, ...(input.t || {}) },
+    promoBanner: sanitizedPromoBanner,
     menu: sanitizedMenu,
     // Permite explicitamente vitrine vazia (produtos: []) sem forçar restauração!
     produtos: sanitizedProducts,
@@ -953,7 +987,7 @@ async function startServer() {
 
   if (!isProd) {
     const vite = await createViteServer({
-      server: { middlewareMode: true, hmr: false },
+      server: { middlewareMode: true, hmr: false, allowedHosts: true },
       appType: 'spa',
     });
     app.use(vite.middlewares);
