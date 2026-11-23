@@ -4,9 +4,10 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, viewport-fit=cover" />
     <script>
-      // In the AI Studio iframe/preview environment, Vite HMR WebSockets are not forwarded across the proxy.
-      // Shim the internal 'vite-hmr' and 'vite-ping' WebSocket instances to prevent false-positive connection errors.
+      // Shim Vite HMR WebSockets only in local/AI Studio preview environments to avoid noisy proxy errors.
       (function() {
+        var host = window.location.hostname || '';
+        if (host !== 'localhost' && host !== '127.0.0.1' && !host.endsWith('.run.app')) return;
         var NativeWebSocket = window.WebSocket;
         if (!NativeWebSocket) return;
         function MockHmrSocket() {
@@ -57,17 +58,14 @@
     <meta name="format-detection" content="telephone=no" />
 
     <!-- PWA Icons & Manifest -->
-    <link rel="icon" type="image/png" href="/uploads/brand-favicon-1791487298420-3e2e18722687098a.png" />
-    <link rel="icon" type="image/svg+xml" href="/icon.svg" />
     <link rel="icon" type="image/x-icon" href="/favicon.ico" />
+    <link rel="icon" type="image/svg+xml" href="/icon.svg" />
     <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
-    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <link rel="manifest" href="/manifest.json" />
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,700;1,9..40,400&family=Fraunces:ital,opsz,wght@0,9..144,300..900;1,9..144,300..900&family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
-    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='50' fill='%231F3F2B'/><text x='50' y='67' font-size='52' font-family='sans-serif' font-weight='800' fill='white' text-anchor='middle'>t.</text></svg>" />
   </head>
   <body class="bg-[#FBF9F5] text-[#1E2420] antialiased selection:bg-[#D44A22]/20 selection:text-[#1F3F2B]">
     <div id="root"></div>

@@ -983,23 +983,40 @@ app.delete('/api/admin/users/:username', requireAuth, (req, res) => {
 
 // Setup dev vs production
 async function startServer() {
-  const isProd = process.env.NODE_ENV === 'production';
+  const distDir = path.join(__dirname, 'dist');
+  const distIndex = path.join(distDir, 'index.html');
+  const hasBuild = fs.existsSync(distIndex);
+  const isProd =
+    process.env.NODE_ENV === 'production' ||
+    (process.env.npm_lifecycle_event === 'start' && hasBuild);
 
-  if (!isProd) {
+  if (isProd && hasBuild) {
+    app.use(
+      express.static(distDir, {
+        setHeaders: (res, filePath) => {
+          if (filePath.endsWith('index.html') || filePath.endsWith('sw.js')) {
+            res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+          }
+        },
+      })
+    );
+    app.get('*', (_req, res) => {
+      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+      res.sendFile(distIndex);
+    });
+  } else {
+    if (isProd && !hasBuild) {
+      console.warn('[Tomati Server] AVISO: NODE_ENV=production mas dist/index.html não existe. Execute "npm run build" antes de subir. Usando fallback Vite.');
+    }
     const vite = await createViteServer({
       server: { middlewareMode: true, hmr: false, allowedHosts: true },
       appType: 'spa',
     });
     app.use(vite.middlewares);
-  } else {
-    app.use(express.static(path.join(__dirname, 'dist')));
-    app.get('*', (_req, res) => {
-      res.sendFile(path.join(__dirname, 'dist', 'index.html'));
-    });
   }
 
   app.listen(Number(PORT), '0.0.0.0', () => {
-    console.log(`[Tomati Server] Rodando na porta ${PORT} (modo ${isProd ? 'produção' : 'desenvolvimento'})`);
+    console.log(`[Tomati Server] Rodando na porta ${PORT} (modo ${isProd && hasBuild ? 'produção' : 'desenvolvimento'})`);
   });
 }
 

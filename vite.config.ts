@@ -47,8 +47,27 @@ export default defineConfig(() => {
           ],
         },
         workbox: {
+          skipWaiting: true,
+          clientsClaim: true,
+          cleanupOutdatedCaches: true,
+          navigateFallbackDenylist: [/^\/api\//, /^\/uploads\//, /^\/store-data\.json$/],
           globPatterns: ['**/*.{js,css,html,ico,png,svg,webp,woff,woff2}'],
           runtimeCaching: [
+            {
+              urlPattern: /^\/(api\/store-data|store-data\.json)$/i,
+              handler: 'NetworkFirst',
+              options: {
+                cacheName: 'tomati-store-data-cache',
+                networkTimeoutSeconds: 4,
+                expiration: {
+                  maxEntries: 5,
+                  maxAgeSeconds: 60 * 60 * 24,
+                },
+                cacheableResponse: {
+                  statuses: [0, 200],
+                },
+              },
+            },
             {
               urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
               handler: 'CacheFirst',
