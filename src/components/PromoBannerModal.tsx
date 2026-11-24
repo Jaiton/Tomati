@@ -114,7 +114,7 @@ export const PromoBannerModal: React.FC<PromoBannerModalProps> = ({
         )}
 
         {config.imageOnly ? (
-          /* Modo Arte Pronta: imagem clicável em destaque */
+          /* Modo Arte Pronta: imagem clicável em destaque sem cortes */
           <div className="flex flex-col overflow-y-auto">
             {hasValidHref ? (
               <a
@@ -122,24 +122,26 @@ export const PromoBannerModal: React.FC<PromoBannerModalProps> = ({
                 target={isExternalLink ? '_blank' : undefined}
                 rel={isExternalLink ? 'noopener noreferrer' : undefined}
                 onClick={onClose}
-                className="block relative w-full bg-[#14201A]"
+                className="block relative w-full bg-[#0B0E0C]"
               >
                 <img
+                  key={activeImageSrc}
                   src={activeImageSrc}
                   alt={config.title || config.tag || 'Campanha Tomati'}
                   referrerPolicy="no-referrer"
                   onError={() => setImgFailed(true)}
-                  className="w-full h-auto max-h-[65vh] object-cover block"
+                  className="w-full h-auto max-h-[68vh] object-contain block mx-auto"
                 />
               </a>
             ) : (
-              <div className="relative w-full bg-[#14201A]">
+              <div className="relative w-full bg-[#0B0E0C]">
                 <img
+                  key={activeImageSrc}
                   src={activeImageSrc}
                   alt={config.title || config.tag || 'Campanha Tomati'}
                   referrerPolicy="no-referrer"
                   onError={() => setImgFailed(true)}
-                  className="w-full h-auto max-h-[65vh] object-cover block"
+                  className="w-full h-auto max-h-[68vh] object-contain block mx-auto"
                 />
               </div>
             )}
@@ -162,9 +164,10 @@ export const PromoBannerModal: React.FC<PromoBannerModalProps> = ({
         ) : (
           /* Modo Editorial Completo: foto compacta + texto + cupom + CTA sem rolagem */
           <div className="flex flex-col overflow-y-auto">
-            {/* Mídia de capa compacta com scrim suave */}
-            <div className="relative w-full h-[145px] sm:h-[168px] bg-[#14201A] shrink-0 overflow-hidden">
+            {/* Mídia de capa compacta com transição suave só na borda inferior */}
+            <div className="relative w-full h-[165px] sm:h-[185px] bg-[#14201A] shrink-0 overflow-hidden">
               <img
+                key={activeImageSrc}
                 src={activeImageSrc}
                 alt={config.title || config.tag || 'Campanha Tomati'}
                 referrerPolicy="no-referrer"
@@ -173,7 +176,7 @@ export const PromoBannerModal: React.FC<PromoBannerModalProps> = ({
               />
               <div
                 aria-hidden="true"
-                className="absolute inset-0 bg-gradient-to-t from-[#0B0E0C] via-[#0B0E0C]/20 to-transparent"
+                className="absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-[#0B0E0C] to-transparent pointer-events-none"
               />
             </div>
 

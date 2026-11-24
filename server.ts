@@ -540,6 +540,7 @@ function getAdminUsers(): StoredAdmin[] {
 // Endpoint Público: Obter dados da vitrine para visitantes
 app.get('/api/store-data', (_req, res) => {
   try {
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
     const data = getStoreData();
     return res.json(data);
   } catch (error) {

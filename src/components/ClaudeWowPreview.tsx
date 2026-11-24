@@ -487,7 +487,7 @@ export const ClaudeWowPreview: React.FC<any> = () => {
     const loadData = async () => {
       // 1. Tenta carregar do endpoint de API do Node/Express
       try {
-        const res = await fetch('/api/store-data');
+        const res = await fetch('/api/store-data', { cache: 'no-store' });
         if (res.ok) {
           const contentType = res.headers.get('content-type') || '';
           if (contentType.includes('application/json')) {
@@ -528,7 +528,7 @@ export const ClaudeWowPreview: React.FC<any> = () => {
 
       // 2. Se a API não respondeu ou retornou HTML (ex: Vercel sem servidor Node), tenta o arquivo estático
       try {
-        const staticRes = await fetch('/store-data.json');
+        const staticRes = await fetch('/store-data.json', { cache: 'no-store' });
         if (staticRes.ok) {
           const contentType = staticRes.headers.get('content-type') || '';
           if (contentType.includes('application/json')) {
@@ -578,6 +578,9 @@ export const ClaudeWowPreview: React.FC<any> = () => {
     };
   }, []);
 
+  const getPromoSignature = (promo: PromoBannerConfig) =>
+    `${promo.image || ''}|${promo.title || ''}|${promo.tag || ''}|${promo.imageOnly ? '1' : '0'}`;
+
   // Exibição automática do Banner Promocional ao carregar os dados da loja
   useEffect(() => {
     if (syncStatus === 'carregando' || promoAutoShownRef.current) return;
@@ -589,7 +592,8 @@ export const ClaudeWowPreview: React.FC<any> = () => {
 
     if (promo.frequency === 'session') {
       try {
-        if (window.sessionStorage.getItem('tomati_promo_dismissed_v1') === '1') {
+        const dismissedSig = window.sessionStorage.getItem('tomati_promo_dismissed_v1');
+        if (dismissedSig === getPromoSignature(promo)) {
           return;
         }
       } catch {}
@@ -607,7 +611,8 @@ export const ClaudeWowPreview: React.FC<any> = () => {
     setIsPromoOpen(false);
     if (!isPromoPreview) {
       try {
-        window.sessionStorage.setItem('tomati_promo_dismissed_v1', '1');
+        const promo = data.promoBanner || DEFAULT_PROMO_BANNER;
+        window.sessionStorage.setItem('tomati_promo_dismissed_v1', getPromoSignature(promo));
       } catch {}
     }
     setIsPromoPreview(false);
@@ -695,9 +700,11 @@ export const ClaudeWowPreview: React.FC<any> = () => {
         }
         const json = await res.json();
         if (json && json.success) {
+          dataRef.current = updated;
           setData(updated);
           try {
-            localStorage.setItem(K, JSON.stringify(updated));
+            safeAuthStorage.setItem(K, JSON.stringify(updated));
+            window.sessionStorage.removeItem('tomati_promo_dismissed_v1');
           } catch {}
           setSyncStatus('online');
           setHasUnsavedChanges(false);
@@ -825,6 +832,8 @@ export const ClaudeWowPreview: React.FC<any> = () => {
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>, fieldKey: string, isProduct?: number) => {
     const file = e.target.files?.[0];
+    // Limpa o input para permitir enviar/substituir novamente mesmo com arquivo de nome igual
+    e.target.value = '';
     if (!file) return;
 
     setAdminMsg('Processando imagem e enviando ao servidor...');
@@ -837,6 +846,8 @@ export const ClaudeWowPreview: React.FC<any> = () => {
           const next = clone(current);
           if (next.produtos && next.produtos[isProduct]) {
             next.produtos[isProduct].img = serverUrl;
+            dataRef.current = next;
+            setData(next);
             const ok = await persistData(next);
             if (ok) {
               setAdminMsg('Foto do produto salva e publicada com sucesso!');
@@ -857,9 +868,11 @@ export const ClaudeWowPreview: React.FC<any> = () => {
             ...(next.promoBanner || {}),
             image: serverUrl,
           };
+          dataRef.current = next;
+          setData(next);
           const ok = await persistData(next);
           if (ok) {
-            setAdminMsg('Imagem do banner promocional salva e publicada com sucesso!');
+            setAdminMsg('✅ Nova imagem do banner salva! Clique em "Pré-visualizar banner agora" para ver.');
           }
         } catch (err: any) {
           setAdminMsg(`⚠️ ${err?.message || 'Falha ao salvar imagem do banner promocional.'}`);
@@ -1721,6 +1734,10 @@ export const ClaudeWowPreview: React.FC<any> = () => {
                 accept="image/*"
                 onChange={(e) => handleFileUpload(e, 'promo_banner')}
               />
+              <span style={{ display: 'block', fontSize: '11px', opacity: 0.78, marginTop: '4px', lineHeight: 1.4 }}>
+                Tamanho ideal: <strong>1200 × 600 px</strong> (horizontal 2:1) no modo normal, ou{' '}
+                <strong>1080 × 1080 px</strong> / <strong>1080 × 1350 px</strong> no Modo Arte Pronta (PNG, JPG ou WebP, máx. 5 MB).
+              </span>
             </label>
 
             <label style={{ margin: 0 }}>
@@ -1939,6 +1956,9 @@ export const ClaudeWowPreview: React.FC<any> = () => {
               accept="image/*"
               onChange={(e) => handleFileUpload(e, 'hero_banner')}
             />
+            <span style={{ display: 'block', fontSize: '11px', opacity: 0.75, marginTop: '4px' }}>
+              Tamanho ideal: 1600 × 900 px (horizontal 16:9).
+            </span>
           </label>
           <label style={{ marginTop: '4px' }}>
             Ou link direto da imagem de fundo do Hero
@@ -2293,6 +2313,9 @@ export const ClaudeWowPreview: React.FC<any> = () => {
                       accept="image/*"
                       onChange={(e) => handleFileUpload(e, '', i)}
                     />
+                    <span style={{ display: 'block', fontSize: '11px', opacity: 0.78, marginTop: '4px' }}>
+                      Tamanho ideal: 1200 × 600 px (horizontal 2:1).
+                    </span>
                   </label>
                   <label style={{ marginTop: '4px' }}>
                     Ou link direto da imagem do banner
@@ -2387,6 +2410,9 @@ export const ClaudeWowPreview: React.FC<any> = () => {
                       accept="image/*"
                       onChange={(e) => handleFileUpload(e, '', i)}
                     />
+                    <span style={{ display: 'block', fontSize: '11px', opacity: 0.75, marginTop: '4px' }}>
+                      Tamanho ideal: 800 × 800 px (quadrada 1:1) ou 800 × 1000 px.
+                    </span>
                   </label>
                   <label style={{ marginTop: '4px' }}>
                     Ou link direto da imagem
