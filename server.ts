@@ -239,7 +239,7 @@ const DEFAULT_STORE_DATA = {
       bg: '#FFC93C',
       c: '#14201A',
       nivel: 3,
-      img: '/uploads/prod-0-1791574605223-2c7d1a4bf863887b.webp',
+      img: '/uploads/prod-0-heymu.webp',
       art: { k: 'jar', body: '#8A4A1C', lab: '#FFF3CF', ink: '#8A4A1C' },
       r: 6,
     },
@@ -252,7 +252,7 @@ const DEFAULT_STORE_DATA = {
       bg: '#1F5A3F',
       c: '#ffffff',
       nivel: 1,
-      img: '/uploads/prod-1-1791574622334-0e74c6338ec9c917.webp',
+      img: '/uploads/prod-1-naveia.webp',
       art: { k: 'carton', body: '#F4F0E4', lab: '#1F5A3F', ink: '#1F5A3F' },
       r: -5,
     },
@@ -265,7 +265,7 @@ const DEFAULT_STORE_DATA = {
       bg: '#D9A066',
       c: '#14201A',
       nivel: 1,
-      img: '/uploads/prod-2-1791574662610-48d5ecddb1eca7a1.webp',
+      img: '/uploads/prod-2-tocca.webp',
       art: { k: 'jar', body: '#B5651D', lab: '#FFF3CF', ink: '#6B3A12' },
       r: 5,
     },
@@ -278,7 +278,7 @@ const DEFAULT_STORE_DATA = {
       bg: '#E63B1F',
       c: '#ffffff',
       nivel: 2,
-      img: '/uploads/prod-3-1791574679934-cbc59ec37082ad65.webp',
+      img: '/uploads/prod-3-yokk.webp',
       art: { k: 'box', body: '#FFF3CF', lab: '#E63B1F', ink: '#E63B1F' },
       r: -6,
     },
@@ -291,7 +291,7 @@ const DEFAULT_STORE_DATA = {
       bg: '#3E2112',
       c: '#FFE9CF',
       nivel: 2,
-      img: '/uploads/prod-4-1791574691333-1310932659851cc1.webp',
+      img: '/uploads/prod-4-fruittitus.webp',
       art: { k: 'pouch', body: '#6B3A22', lab: '#FFE9CF', ink: '#3E2112' },
       r: 4,
     },
@@ -306,7 +306,7 @@ const DEFAULT_STORE_DATA = {
       bg: '#14201A',
       c: '#FFC93C',
       borderColor: '#E63B1F',
-      img: '/uploads/prod-5-1791574703755-ac77a2e13b29d519.webp',
+      img: '/uploads/prod-5-banner.webp',
       r: 0,
     },
   ],
@@ -357,16 +357,34 @@ function normalizeStoreData(input: any) {
     url: sanitizeUrl(m?.url || '#'),
   }));
 
+  const LEGACY_PRODUCT_IMAGES: Record<string, string> = {
+    '/uploads/prod-0-1791487429247-7d7abddb3e541f76.webp': '/uploads/prod-0-heymu.webp',
+    '/uploads/prod-1-1791487449958-5a425616d53b9020.webp': '/uploads/prod-1-naveia.webp',
+    '/uploads/prod-2-1791489729222-e1e477df9b7369a1.webp': '/uploads/prod-2-tocca.webp',
+    '/uploads/prod-3-1791487489811-86dc0248b2ad0237.webp': '/uploads/prod-3-yokk.webp',
+    '/uploads/prod-4-1791487499648-99ee1a843e164e7d.webp': '/uploads/prod-4-fruittitus.webp',
+    '/uploads/prod-5-1791490811727-a8f97bba15148e5b.webp': '/uploads/prod-5-banner.webp',
+    '/uploads/prod-0-1791574605223-2c7d1a4bf863887b.webp': '/uploads/prod-0-heymu.webp',
+    '/uploads/prod-1-1791574622334-0e74c6338ec9c917.webp': '/uploads/prod-1-naveia.webp',
+    '/uploads/prod-2-1791574662610-48d5ecddb1eca7a1.webp': '/uploads/prod-2-tocca.webp',
+    '/uploads/prod-3-1791574679934-cbc59ec37082ad65.webp': '/uploads/prod-3-yokk.webp',
+    '/uploads/prod-4-1791574691333-1310932659851cc1.webp': '/uploads/prod-4-fruittitus.webp',
+    '/uploads/prod-5-1791574703755-ac77a2e13b29d519.webp': '/uploads/prod-5-banner.webp',
+  };
+
   const rawProducts = Array.isArray(input.produtos) ? input.produtos : DEFAULT_STORE_DATA.produtos;
-  const sanitizedProducts = rawProducts.map((p: any) => ({
-    ...p,
-    nome: String(p?.nome || 'Produto'),
-    texto: String(p?.texto || ''),
-    price: String(p?.price || ''),
-    link: typeof p?.link === 'string' ? p.link : 'portal',
-    cta: String(p?.cta || 'Pedir agora'),
-    img: typeof p?.img === 'string' && (p.img.startsWith('/uploads') || p.img.startsWith('http') || p.img.startsWith('data:image/')) ? p.img : '',
-  }));
+  const sanitizedProducts = rawProducts.map((p: any) => {
+    const rawImg = typeof p?.img === 'string' && (p.img.startsWith('/uploads') || p.img.startsWith('http') || p.img.startsWith('data:image/')) ? p.img : '';
+    return {
+      ...p,
+      nome: String(p?.nome || 'Produto'),
+      texto: String(p?.texto || ''),
+      price: String(p?.price || ''),
+      link: typeof p?.link === 'string' ? p.link : 'portal',
+      cta: String(p?.cta || 'Pedir agora'),
+      img: LEGACY_PRODUCT_IMAGES[rawImg] || rawImg,
+    };
+  });
 
   const rawPromo = input.promoBanner && typeof input.promoBanner === 'object' ? input.promoBanner : {};
   const validLinkTypes = ['portal', 'ifood', 'custom'];

@@ -86,30 +86,30 @@ export const PromoBannerModal: React.FC<PromoBannerModalProps> = ({
 
   return (
     <div
-      className="fixed inset-0 z-[120] flex items-center justify-center p-4 sm:p-6 bg-black/75 backdrop-blur-xs transition-opacity duration-200"
+      className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-black/75 backdrop-blur-xs transition-opacity duration-200"
       onClick={onClose}
       role="dialog"
       aria-modal="true"
       aria-label={config.title || config.tag || 'Campanha Tomati'}
     >
       <div
-        className="relative w-full max-w-[540px] rounded-[24px] overflow-hidden bg-[#0B0E0C] text-[#FAF8F5] border border-white/15 shadow-2xl transition-transform duration-200 max-h-[92vh] flex flex-col"
+        className="relative w-full max-w-[430px] rounded-[22px] overflow-hidden bg-[#0B0E0C] text-[#FAF8F5] border border-white/15 shadow-2xl transition-transform duration-200 max-h-[88vh] flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Botão de fechar com alvo de toque >= 44px */}
+        {/* Botão de fechar discreto e acessível */}
         <button
           type="button"
           onClick={onClose}
           aria-label="Fechar aviso promocional"
           title="Fechar (ESC)"
-          className="absolute top-3 right-3 z-20 w-11 h-11 rounded-full bg-black/65 hover:bg-black/85 text-white border border-white/20 flex items-center justify-center transition-colors duration-150 cursor-pointer focus-visible:outline-2 focus-visible:outline-[#FFC93C]"
+          className="absolute top-2.5 right-2.5 z-20 w-9 h-9 rounded-full bg-black/65 hover:bg-black/85 text-white border border-white/20 flex items-center justify-center transition-colors duration-150 cursor-pointer focus-visible:outline-2 focus-visible:outline-[#FFC93C]"
         >
-          <X size={20} />
+          <X size={18} />
         </button>
 
         {isPreview && (
-          <div className="px-5 py-2 bg-[#FFC93C] text-[#14201A] text-xs font-bold tracking-wide text-center shrink-0">
-            Pré-visualização do painel — os visitantes verão exatamente assim
+          <div className="px-4 py-1.5 bg-[#FFC93C] text-[#14201A] text-[11px] font-bold tracking-wide text-center shrink-0">
+            Pré-visualização do painel — os visitantes verão assim
           </div>
         )}
 
@@ -129,7 +129,7 @@ export const PromoBannerModal: React.FC<PromoBannerModalProps> = ({
                   alt={config.title || config.tag || 'Campanha Tomati'}
                   referrerPolicy="no-referrer"
                   onError={() => setImgFailed(true)}
-                  className="w-full h-auto max-h-[74vh] object-cover block"
+                  className="w-full h-auto max-h-[65vh] object-cover block"
                 />
               </a>
             ) : (
@@ -139,37 +139,37 @@ export const PromoBannerModal: React.FC<PromoBannerModalProps> = ({
                   alt={config.title || config.tag || 'Campanha Tomati'}
                   referrerPolicy="no-referrer"
                   onError={() => setImgFailed(true)}
-                  className="w-full h-auto max-h-[74vh] object-cover block"
+                  className="w-full h-auto max-h-[65vh] object-cover block"
                 />
               </div>
             )}
 
             {config.ctaText.trim() && hasValidHref && (
-              <div className="p-4 sm:p-5 bg-[#0B0E0C] border-t border-white/10 flex items-center justify-between gap-3">
+              <div className="p-3.5 bg-[#0B0E0C] border-t border-white/10 flex items-center justify-between gap-2.5">
                 <a
                   href={ctaHref}
                   target={isExternalLink ? '_blank' : undefined}
                   rel={isExternalLink ? 'noopener noreferrer' : undefined}
                   onClick={onClose}
-                  className="flex-1 inline-flex items-center justify-center gap-2 py-3 px-6 rounded-full bg-[#FFC93C] hover:bg-[#ffd45e] text-[#14201A] font-bold text-sm transition-colors duration-150 whitespace-nowrap"
+                  className="flex-1 inline-flex items-center justify-center gap-2 py-2.5 px-5 rounded-full bg-[#FFC93C] hover:bg-[#ffd45e] text-[#14201A] font-bold text-sm transition-colors duration-150 whitespace-nowrap"
                 >
                   <span>{config.ctaText}</span>
-                  <ArrowUpRight size={16} />
+                  <ArrowUpRight size={15} />
                 </a>
               </div>
             )}
           </div>
         ) : (
-          /* Modo Editorial Completo: foto + texto + cupom + CTA */
+          /* Modo Editorial Completo: foto compacta + texto + cupom + CTA sem rolagem */
           <div className="flex flex-col overflow-y-auto">
-            {/* Mídia de capa 16:9 com scrim suave para transição no fundo escuro */}
-            <div className="relative w-full aspect-[16/9] bg-[#14201A] shrink-0 overflow-hidden">
+            {/* Mídia de capa compacta com scrim suave */}
+            <div className="relative w-full h-[145px] sm:h-[168px] bg-[#14201A] shrink-0 overflow-hidden">
               <img
                 src={activeImageSrc}
                 alt={config.title || config.tag || 'Campanha Tomati'}
                 referrerPolicy="no-referrer"
                 onError={() => setImgFailed(true)}
-                className="w-full h-full object-cover block"
+                className="w-full h-full object-cover object-center block"
               />
               <div
                 aria-hidden="true"
@@ -177,71 +177,81 @@ export const PromoBannerModal: React.FC<PromoBannerModalProps> = ({
               />
             </div>
 
-            {/* Conteúdo tipográfico */}
-            <div className="px-6 pt-4 pb-6 sm:px-8 sm:pb-7 flex flex-col gap-4">
+            {/* Conteúdo tipográfico compacto */}
+            <div className="px-5 pt-3 pb-5 sm:px-6 sm:pb-6 flex flex-col gap-3">
               {config.tag.trim() && (
-                <div className="text-xs font-bold tracking-[0.14em] uppercase text-[#FFC93C]">
+                <div className="text-[11px] font-bold tracking-[0.14em] uppercase text-[#FFC93C]">
                   {config.tag}
                 </div>
               )}
 
               {config.title.trim() && (
-                <h2
-                  className="text-2xl sm:text-[28px] font-extrabold leading-[1.12] tracking-[-0.02em] text-white m-0"
+                <div
+                  role="heading"
+                  aria-level={2}
+                  className="font-extrabold text-white m-0"
                   style={{
                     fontFamily: "'Bricolage Grotesque', 'Plus Jakarta Sans', sans-serif",
+                    fontSize: 'clamp(20px, 2.6vw, 24px)',
+                    lineHeight: 1.18,
+                    letterSpacing: '-0.02em',
                     textWrap: 'balance',
                   }}
                 >
                   {config.title}
-                </h2>
+                </div>
               )}
 
               {config.description.trim() && (
-                <p className="text-sm sm:text-[15px] leading-relaxed text-[#FAF8F5]/80 m-0">
+                <p
+                  className="text-[#FAF8F5]/80 m-0"
+                  style={{ fontSize: '13.5px', lineHeight: 1.5 }}
+                >
                   {config.description}
                 </p>
               )}
 
               {/* Cupom clicável (opcional) */}
               {config.coupon.trim() && (
-                <div className="flex items-center justify-between gap-3 px-4 py-3 rounded-xl bg-white/[0.06] border border-white/12">
+                <div className="flex items-center justify-between gap-3 px-3.5 py-2.5 rounded-xl bg-white/[0.06] border border-white/12">
                   <div className="flex flex-col">
-                    <span className="text-[11px] text-[#FAF8F5]/60">Cupom da campanha</span>
-                    <span className="font-mono text-base font-bold tracking-wider text-[#FFC93C] tabular-nums">
+                    <span className="text-[10px] uppercase tracking-wider text-[#FAF8F5]/55">
+                      Cupom da campanha
+                    </span>
+                    <span className="font-mono text-sm font-bold tracking-wider text-[#FFC93C] tabular-nums">
                       {config.coupon.trim()}
                     </span>
                   </div>
                   <button
                     type="button"
                     onClick={handleCopyCoupon}
-                    className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-white/10 hover:bg-white/15 text-xs font-semibold text-white transition-colors duration-150 cursor-pointer whitespace-nowrap shrink-0"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/15 text-xs font-semibold text-white transition-colors duration-150 cursor-pointer whitespace-nowrap shrink-0"
                   >
-                    {copied ? <Check size={14} className="text-[#FFC93C]" /> : <Copy size={14} />}
+                    {copied ? <Check size={13} className="text-[#FFC93C]" /> : <Copy size={13} />}
                     <span>{copied ? 'Copiado' : 'Copiar'}</span>
                   </button>
                 </div>
               )}
 
               {/* Ações */}
-              <div className="pt-1 flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+              <div className="pt-1 flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
                 {config.ctaText.trim() && hasValidHref && (
                   <a
                     href={ctaHref}
                     target={isExternalLink ? '_blank' : undefined}
                     rel={isExternalLink ? 'noopener noreferrer' : undefined}
                     onClick={onClose}
-                    className="flex-1 inline-flex items-center justify-center gap-2 py-3.5 px-6 rounded-full bg-[#E63B1F] hover:bg-[#cf3319] text-white font-bold text-sm transition-colors duration-150 whitespace-nowrap"
+                    className="flex-1 inline-flex items-center justify-center gap-1.5 py-2.5 px-4 rounded-full bg-[#E63B1F] hover:bg-[#cf3319] text-white font-bold text-[13.5px] transition-colors duration-150 whitespace-nowrap"
                   >
                     <span>{config.ctaText}</span>
-                    <ArrowUpRight size={16} />
+                    <ArrowUpRight size={15} />
                   </a>
                 )}
 
                 <button
                   type="button"
                   onClick={onClose}
-                  className="py-3 px-5 rounded-full text-sm font-semibold text-[#FAF8F5]/75 hover:text-white hover:bg-white/10 transition-colors duration-150 cursor-pointer whitespace-nowrap"
+                  className="py-2.5 px-4 rounded-full text-[13px] font-semibold text-[#FAF8F5]/75 hover:text-white hover:bg-white/10 transition-colors duration-150 cursor-pointer whitespace-nowrap"
                 >
                   Continuar para o site
                 </button>
